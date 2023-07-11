@@ -14,8 +14,18 @@ def run_harvester(creep):
     """
     Runs a creep as a generic harvester.
     Current issues: Creep memory does not get removed after creep death
-                    Creep target is kind of shit and only targets the controller
+                    Creep target is kind of shit, but better than before
                     Creeps are not linked to one specific mine
+
+                    This error pops up every once a while:
+                    TypeError: Cannot read property 'pos' of undefined
+                    at RoomPosition.inRangeTo (<runtime>:14512:20)
+                    at Object.run_harvester (main:1067:29)
+                    at Object.main (main:1156:13)
+                    at __mainLoop:1:52
+                    at __mainLoop:2:3
+                    at Object.exports.evalCode (<runtime>:15851:76)
+                    at Object.exports.run (<runtime>:46474:24)
     :param creep: The creep to run
     """
 
@@ -103,23 +113,48 @@ def run_harvester(creep):
                     creep.moveTo(target)
             else:
                 result = creep.build(target)
-                if result != OK:
-                    del creep.memory.target
         else:
-            creep.moveTo(target)
+            result = creep.moveTo(target)
+            if result == -7:
+                print('Creep - ' + str(creep.name) + ' attempted to path to an invalid target. Removing memory.')
+                print('Creep - ' + str(creep.name) + ' target was: ' + str(creep.memory.target) + ' and role ' + str(creep.memory.job))
+                del creep.memory.target
 
-def create_optimal (room_capacity):
-    optimal_harvester = []
+def create_max_work (room_capacity):
+    modules = []
 
     # Starter chump:
     if room_capacity == 300:
-        optimal_harvester = [WORK, WORK, CARRY, MOVE]
+        modules = [WORK, WORK, CARRY, MOVE]
 
     # If we have 1 or more extensions:
     room_capacity = room_capacity - 150
     for i in range(int(room_capacity/100)): #int rounds down
-        optimal_harvester.append(WORK)
-    optimal_harvester.append(CARRY)
-    optimal_harvester.append(MOVE)
-    optimal_harvester.append(MOVE)
-    return optimal_harvester
+        modules.append(WORK)
+    modules.append(CARRY)
+    modules.append(MOVE)
+    modules.append(MOVE)
+
+    return modules
+
+def create_balanced (room_capacity):
+    modules = []
+
+    # Starter chump:
+    if room_capacity == 300:
+        modules = [WORK, WORK, CARRY, MOVE]
+
+    # If we have 1 or more extensions:
+    # each full set of parts costs 1 work = 100 + 1 move = 50 + 1 carry = 50, sum = 200.
+    full_sets = int(room_capacity/200)
+    for i in range(int(room_capacity/200)): #int rounds down
+        modules.append(WORK)
+        modules.append(CARRY)
+        modules.append(MOVE)
+    # If we can slap another free move and carry on this bad boi, do so.
+    if (room_capacity - (full_sets * 200)) >=100:
+        modules.append(CARRY)
+        modules.append(MOVE)
+    modules.sort()
+    # print ('Debug log - ', room_capacity, full_sets, modules)
+    return modules

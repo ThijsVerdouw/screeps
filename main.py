@@ -42,19 +42,20 @@ def main():
             # Also setting room capacity until upgraded with this line.
             if num_creeps == 0 and spawn.room.energyAvailable >= 250:
                 spawn.createCreep([WORK, CARRY, MOVE, MOVE])
-                optimal_harvester = harvester.create_optimal(spawn.room.energyCapacityAvailable)
+                optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
                 print('The current setup supports the following harvester: ', optimal_harvester)
 
-        if num_creeps < 7:
+        if num_creeps < 5:
             # If we do not have enough bois to mine
             if spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable:
                 creep_name = 'Harvester_' + str(Game.time)
 
                 # Temporary place for this optimal harvester code, want to have this in memory.
-                optimal_harvester = harvester.create_optimal(spawn.room.energyCapacityAvailable)
+                optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
                 print("Spawning operation status: ", spawn.spawnCreep(optimal_harvester, creep_name))
                 print("for creep: ", optimal_harvester, creep_name)
 
             else:
                 print("Awaiting resources for spawning")
+        Strategy.RoomEnergyIdentifier (Game.rooms[location])
 module.exports.loop = main
