@@ -1,3 +1,4 @@
+import Strategy
 from defs import *
 
 __pragma__('noalias', 'name')
@@ -17,7 +18,7 @@ def run_harvester(creep):
                     Creep target is kind of shit, but better than before
                     Creeps are not linked to one specific mine
 
-                    This error pops up every once a while:
+                    This error pops up when a creep was refilling energy, but now the energy source is full:
                     TypeError: Cannot read property 'pos' of undefined
                     at RoomPosition.inRangeTo (<runtime>:14512:20)
                     at Object.run_harvester (main:1067:29)
@@ -26,13 +27,14 @@ def run_harvester(creep):
                     at __mainLoop:2:3
                     at Object.exports.evalCode (<runtime>:15851:76)
                     at Object.exports.run (<runtime>:46474:24)
+                    Need to add logic to select the closest construction site to the target selection.
     :param creep: The creep to run
     """
 
     # If we're full, stop filling up and remove the saved source
     if creep.memory.filling and _.sum(creep.carry) >= creep.carryCapacity:
         creep.memory.filling = False
-        del creep.memory.source
+
     # If we're empty, start filling again and remove the saved target
     elif not creep.memory.filling and creep.carry.energy <= 0:
         creep.memory.filling = True
@@ -44,9 +46,9 @@ def run_harvester(creep):
         if creep.memory.source:
             source = Game.getObjectById(creep.memory.source)
         else:
-            # Get a random new source and save it
-            source = _.sample(creep.room.find(FIND_SOURCES))
-            creep.memory.source = source.id
+            # get assigned a source by the room manager:
+            creep.memory.source = Strategy.assignSameRoomSource(creep.room)
+
 
         # If we're near the source, harvest it - otherwise, move to it.
         if creep.pos.isNearTo(source):
@@ -64,21 +66,41 @@ def run_harvester(creep):
             # print('Creep room phase: ' + str(creep.room.GamePhase) + ', roomname: ' + str (Game.rooms[creep.room.name]) + str(creep.room.name) )
             if creep.room.memory.GamePhase == 'GameStart':
                 # First check if the spawns or extensions are empty:
+                # target = creep.room.find(FIND_STRUCTURES) \
+                #     .filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION)
+                #                        and s.energy < s.energyCapacity)
+                # if len(target) >0 :
+                #     creep.memory.target = Game.getObjectById(creep.pos.findClosestByPath(target).id)
+                #     creep.memory.job = 'Replenish'
+                #     # print(targetb)
+
+
                 target = _(creep.room.find(FIND_STRUCTURES)) \
-                    .filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION)
-                                       and s.energy < s.energyCapacity) \
-                    .sample()
+                                    .filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION)
+                                                       and s.energy < s.energyCapacity) \
+                                    .sample()
                 if len(target) >0 :
                     creep.memory.target = target.id
+                    print(target.id, target.id == targetb)
                     creep.memory.job = 'Replenish'
 
+
                 # If the spawns and extensions are full, build:
+
                 elif len(creep.room.find(FIND_CONSTRUCTION_SITES)) >0 :
                     target = _(creep.room.find(FIND_CONSTRUCTION_SITES)) \
                         .filter(lambda s: (s.structureType != STRUCTURE_SPAWN and s.progress >-1)) \
                         .sample()
                     creep.memory.target = target.id
                     creep.memory.job = 'Build'
+
+                # something to add to find closest: creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES)
+                # elif len(creep.room.find(FIND_CONSTRUCTION_SITES)) >0 :
+                #     target = _(creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES)) \
+                #         .filter(lambda s: (s.progress >-1))
+                #     creep.memory.target = target.id
+                #     creep.memory.job = 'Build'
+                    # creep.pos.findClosestByRange(FIND_ACTIVE_SOURCES)
 
                 # Upgrade the controller
                 else:
@@ -98,9 +120,9 @@ def run_harvester(creep):
             # If we are targeting a spawn or extension, transfer energy. Otherwise, use upgradeController on it.
             if target.energyCapacity:
                 result = creep.transfer(target, RESOURCE_ENERGY)
-                if result == OK or result == ERR_FULL:
+                if target.energy >= target.energyCapacity or creep.carry <= 0:
                     del creep.memory.target
-                else:
+                elif result in (-7,-10):
                     print("[{}] Unknown result from creep.transfer({}, {}): {}".format(
                         creep.name, target, RESOURCE_ENERGY, result))
             elif target.structureType == 'controller':

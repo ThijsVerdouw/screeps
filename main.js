@@ -2,7 +2,7 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-// Transcrypt'ed from Python, 2023-07-11 14:03:56
+// Transcrypt'ed from Python, 2023-07-12 11:24:46
 var __name__ = 'org.transcrypt.__runtime__';
 
 function __nest__ (headObject, tailNames, value) {
@@ -953,16 +953,19 @@ var __terminal__ = __Terminal__ ();
 var print = __terminal__.print;
 __terminal__.input;
 
-// Transcrypt'ed from Python, 2023-07-11 14:03:56
+// Transcrypt'ed from Python, 2023-07-12 11:24:47
 var DetermineGamePhase = function (location) {
 	if (location.memory.GamePhase == null) {
 		location.memory.GamePhase = 'Debug';
+		location.memory.minersPerAccessPoint = 0;
 	}
 	else if (location.energyCapacityAvailable < 2000) {
 		location.memory.GamePhase = 'GameStart';
+		location.memory.minersPerAccessPoint = 2;
 	}
 	else {
 		location.memory.GamePhase = 'ReadyToRumble';
+		location.memory.minersPerAccessPoint = 1;
 	}
 };
 var ManageRoom = function (location) {
@@ -989,32 +992,69 @@ var RoomEnergyIdentifier = function (location) {
 		var x = source.pos.x;
 		var y = source.pos.y;
 		var accessPoints = 0;
+		var totalAccesPoints = 0;
 		for (var xChange = 0; xChange < 3; xChange++) {
 			var newX = (x - xChange) + 1;
 			for (var yChange = 0; yChange < 3; yChange++) {
 				var newY = (y - yChange) + 1;
-				if (terrain.get (newX, newY) == 0 && x != newX && y != newY) {
+				if (terrain.get (newX, newY) == 0) {
 					var accessPoints = accessPoints + 1;
 				}
 			}
 		}
+		var totalAccesPoints = totalAccesPoints + accessPoints;
 		listForSourceData.append ([source, accessPoints]);
 	}
+	location.memory.totalAccesPoints = totalAccesPoints;
 	location.memory.sourceAccessability = listForSourceData;
+};
+var identifyHarvestersNeeded = function (location) {
+	if (location.memory.GamePhase == 'PlaceHolder') {
+		location.memory.requiredHarvesters = location.memory.totalAccesPoints * 2;
+	}
+	else if (location.memory.GamePhase == 'GameStart') {
+		location.memory.requiredHarvesters = location.memory.totalAccesPoints * 2;
+	}
+	else if (location.memory.GamePhase == 'ReadyToRumble') {
+		location.memory.requiredHarvesters = location.memory.totalAccesPoints * 1;
+	}
+	else {
+		location.memory.requiredHarvesters = 4;
+	}
+};
+var assignSameRoomSource = function (location) {
+	for (var i = 0; i < len (location.memory.sourceAccessability); i++) {
+		var source = location.memory.sourceAccessability [i] [0];
+		var requiredCreeps = location.memory.sourceAccessability [i] [1] * location.memory.minersPerAccessPoint;
+		var num_creeps = len (location.find (FIND_CREEPS).filter ((function __lambda__ (c) {
+			return c.memory.source == source.id && len (c.memory.source) > 0;
+		})));
+		print ('Source: ', (((str (source.id) + ', requiredCreeps: ') + str (requiredCreeps)) + ' num_creeps ') + str (num_creeps));
+		for (var creepboi of location.find (FIND_CREEPS)) {
+			print (creepboi, creepboi.memory.source);
+		}
+		if (num_creeps < requiredCreeps && requiredCreeps > -(1)) {
+			print ('assigned source id: ', str (source.id));
+			return source.id;
+		}
+	}
 };
 
 var __module_Strategy__ = /*#__PURE__*/Object.freeze({
     __proto__: null,
     DetermineGamePhase: DetermineGamePhase,
     ManageRoom: ManageRoom,
-    RoomEnergyIdentifier: RoomEnergyIdentifier
+    RoomEnergyIdentifier: RoomEnergyIdentifier,
+    identifyHarvestersNeeded: identifyHarvestersNeeded,
+    assignSameRoomSource: assignSameRoomSource
 });
 
-// Transcrypt'ed from Python, 2023-07-11 14:03:56
+// Transcrypt'ed from Python, 2023-07-12 11:24:47
+var Strategy$1 = {};
+__nest__ (Strategy$1, '', __module_Strategy__);
 var run_harvester = function (creep) {
 	if (creep.memory.filling && _.sum (creep.carry) >= creep.carryCapacity) {
 		creep.memory.filling = false;
-		delete creep.memory.source;
 	}
 	else if (!(creep.memory.filling) && creep.carry.energy <= 0) {
 		creep.memory.filling = true;
@@ -1026,8 +1066,7 @@ var run_harvester = function (creep) {
 			var source = Game.getObjectById (creep.memory.source);
 		}
 		else {
-			var source = _.sample (creep.room.find (FIND_SOURCES));
-			creep.memory.source = source.id;
+			creep.memory.source = Strategy$1.assignSameRoomSource (creep.room);
 		}
 		if (creep.pos.isNearTo (source)) {
 			var result = creep.harvest (source);
@@ -1049,6 +1088,7 @@ var run_harvester = function (creep) {
 			})).sample ();
 			if (len (target) > 0) {
 				creep.memory.target = target.id;
+				print (target.id, target.id == targetb);
 				creep.memory.job = 'Replenish';
 			}
 			else if (len (creep.room.find (FIND_CONSTRUCTION_SITES)) > 0) {
@@ -1072,10 +1112,10 @@ var run_harvester = function (creep) {
 		if (is_close) {
 			if (target.energyCapacity) {
 				var result = creep.transfer (target, RESOURCE_ENERGY);
-				if (result == OK || result == ERR_FULL) {
+				if (target.energy >= target.energyCapacity || creep.carry <= 0) {
 					delete creep.memory.target;
 				}
-				else {
+				else if ((result in [-(7), -(10)])) {
 					print ('[{}] Unknown result from creep.transfer({}, {}): {}'.format (creep.name, target, RESOURCE_ENERGY, result));
 				}
 			}
@@ -1142,7 +1182,7 @@ var __module_harvester__ = /*#__PURE__*/Object.freeze({
     create_balanced: create_balanced
 });
 
-// Transcrypt'ed from Python, 2023-07-11 14:03:56
+// Transcrypt'ed from Python, 2023-07-12 11:24:47
 var Strategy = {};
 var harvester = {};
 __nest__ (Strategy, '', __module_Strategy__);
@@ -1151,6 +1191,8 @@ var main = function () {
 	for (var location of Object.keys (Game.rooms)) {
 		Strategy.DetermineGamePhase (Game.rooms [location]);
 		Strategy.ManageRoom (Game.rooms [location]);
+		Strategy.RoomEnergyIdentifier (Game.rooms [location]);
+		Strategy.identifyHarvestersNeeded (Game.rooms [location]);
 	}
 	for (var name of Object.keys (Game.creeps)) {
 		var creep = Game.creeps [name];
@@ -1162,24 +1204,21 @@ var main = function () {
 			var num_creeps = _.sum (Game.creeps, (function __lambda__ (c) {
 				return c.pos.roomName == spawn.pos.roomName;
 			}));
-			if (num_creeps == 0 && spawn.room.energyAvailable >= 250) {
-				spawn.createCreep ([WORK, CARRY, MOVE, MOVE]);
-				var optimal_harvester = harvester.create_balanced (spawn.room.energyCapacityAvailable);
-				print ('The current setup supports the following harvester: ', optimal_harvester);
+			if (num_creeps < spawn.room.memory.requiredHarvesters) {
+				if (spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable) {
+					var creep_name = 'Harvester_' + str (Game.time);
+					var optimal_harvester = harvester.create_balanced (spawn.room.energyCapacityAvailable);
+					print ('Spawning operation status: ', spawn.spawnCreep (optimal_harvester, creep_name));
+					print ('for creep: ', optimal_harvester, creep_name);
+				}
+				else if (num_creeps == 0) {
+					var creep_name = 'Harvester_' + str (Game.time);
+					var optimal_harvester = [WORK, WORK, CARRY, MOVE];
+					print ('Spawning operation status: ', spawn.spawnCreep (optimal_harvester, creep_name));
+					print ('for creep: ', optimal_harvester, creep_name);
+				}
 			}
 		}
-		if (num_creeps < 5) {
-			if (spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable) {
-				var creep_name = 'Harvester_' + str (Game.time);
-				var optimal_harvester = harvester.create_balanced (spawn.room.energyCapacityAvailable);
-				print ('Spawning operation status: ', spawn.spawnCreep (optimal_harvester, creep_name));
-				print ('for creep: ', optimal_harvester, creep_name);
-			}
-			else {
-				print ('Awaiting resources for spawning');
-			}
-		}
-		Strategy.RoomEnergyIdentifier (Game.rooms [location]);
 	}
 };
 module.exports.loop = main;

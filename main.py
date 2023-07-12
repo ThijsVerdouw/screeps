@@ -27,6 +27,14 @@ def main():
         Strategy.DetermineGamePhase (Game.rooms[location])
         Strategy.ManageRoom(Game.rooms[location])
 
+        # to be executed once per !game!:
+        Strategy.RoomEnergyIdentifier (Game.rooms[location])
+
+        # Executed every 1000 ticks:
+        Strategy.identifyHarvestersNeeded (Game.rooms[location])
+        # print(Game.rooms[location])
+
+
     # Run each creep
     for name in Object.keys(Game.creeps):
         creep = Game.creeps[name]
@@ -38,24 +46,26 @@ def main():
         if not spawn.spawning:
             # Get the number of our creeps in the room.
             num_creeps = _.sum(Game.creeps, lambda c: c.pos.roomName == spawn.pos.roomName)
-            # If there are no creeps, spawn a creep once energy is at 250 or more
-            # Also setting room capacity until upgraded with this line.
-            if num_creeps == 0 and spawn.room.energyAvailable >= 250:
-                spawn.createCreep([WORK, CARRY, MOVE, MOVE])
-                optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
-                print('The current setup supports the following harvester: ', optimal_harvester)
 
-        if num_creeps < 5:
-            # If we do not have enough bois to mine
-            if spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable:
-                creep_name = 'Harvester_' + str(Game.time)
+            # If we do not have enough bois to mine (calculated on a room-level)
+            if num_creeps < spawn.room.memory.requiredHarvesters:
+                # If we can afford a boi:
+                if spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable:
+                    creep_name = 'Harvester_' + str(Game.time)
 
-                # Temporary place for this optimal harvester code, want to have this in memory.
-                optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
-                print("Spawning operation status: ", spawn.spawnCreep(optimal_harvester, creep_name))
-                print("for creep: ", optimal_harvester, creep_name)
+                    # Temporary place for this optimal harvester code, want to have this in memory.
+                    optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
+                    print("Spawning operation status: ", spawn.spawnCreep(optimal_harvester, creep_name))
+                    print("for creep: ", optimal_harvester, creep_name)
+                elif num_creeps == 0:
+                    creep_name = 'Harvester_' + str(Game.time)
+                    optimal_harvester = [WORK, WORK, CARRY, MOVE]
+                    print("Spawning operation status: ", spawn.spawnCreep(optimal_harvester, creep_name))
+                    print("for creep: ", optimal_harvester, creep_name)
 
-            else:
-                print("Awaiting resources for spawning")
-        Strategy.RoomEnergyIdentifier (Game.rooms[location])
+                # else:
+                #     print("Awaiting resources for spawning")
+            # else:
+                # do nothing
+
 module.exports.loop = main
