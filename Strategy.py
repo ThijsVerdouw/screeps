@@ -15,10 +15,13 @@ def DetermineGamePhase (location):
     # print('Before logic: ' + str(location.memory.GamePhase) + ' For var: ' + str(location))
     if location.memory.GamePhase == None:
         location.memory.GamePhase = 'Debug'
+        location.memory.minersPerAccessPoint = 0
     elif location.energyCapacityAvailable < 2000:
         location.memory.GamePhase = 'GameStart'
+        location.memory.minersPerAccessPoint = 2
     else:
         location.memory.GamePhase = 'ReadyToRumble'
+        location.memory.minersPerAccessPoint = 1
 
     # print(location.memory.GamePhase)
 
@@ -38,6 +41,9 @@ def ManageRoom (location):
         print('GamePhase unclear.')
 
 def RoomEnergyIdentifier (location):
+    # The aim of this fuction is to identify how many people could theoretically mine at the same time in one room.
+    # This number is then used to determine the required number of miners at a given point in the game.
+
     sources = location.find(FIND_SOURCES)
     # print(sources)
     # This contains the number of sources, something to be used for assinging creeps to energy sources
@@ -54,7 +60,8 @@ def RoomEnergyIdentifier (location):
     for source in sources:
         x = (source.pos.x)
         y = (source.pos.y)
-        accessPoints = 0
+        accessPoints = 0 # per source
+        totalAccesPoints = 0 # Entire room
 
         for xChange in range(3):
             newX = x - xChange + 1
@@ -63,12 +70,51 @@ def RoomEnergyIdentifier (location):
                 # terrain = 0 means plains.
                 # The and statement here is clunky but it works
                 # print('Terrain at X: ' + str(newX) + ' Y: ' + str(newY) + ' ' + str(terrain.get (newX, newY)))
-                if terrain.get(newX,newY) == 0 and x != newX and y != newY:
+                if terrain.get(newX,newY) == 0 :
+                # Nice code to disable seeing the source itself, not needed because sources are in walls:
+                # and source.pos.x != newX and source.pos.y != newY:
                     # print('Terrain at X: ' + str(newX) + ' Y: ' + str(newY) + ' ' + str(terrain.get (newX, newY)) + ' was considered an access point' )
                     accessPoints = accessPoints + 1
+        totalAccesPoints = totalAccesPoints + accessPoints
         listForSourceData.append([source, accessPoints])
-        # print ('The following source data ')
+    # print (listForSourceData)
+    location.memory.totalAccesPoints = totalAccesPoints
     location.memory.sourceAccessability = listForSourceData
+
+def identifyHarvestersNeeded (location):
+    # The aim of this fuction is to determine the number of needed harvesters in a room, by using the number of access points of all of the sources as a baseline.
+    # This number is then used to compare against in Main.py, to determine if new creeps have to be spawned.
+
+    # If a lot of construction still has to be done
+    if location.memory.GamePhase == 'PlaceHolder':
+        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 2
+    # If the main objective is to upgrade the controller
+    elif location.memory.GamePhase == 'GameStart':
+        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 2
+    # In the midgame we want to just have the 1 dedicated dude on one source, as they can empty it out (probably)
+    elif location.memory.GamePhase == 'ReadyToRumble':
+        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 1
+    # debugging
+    else:
+        location.memory.requiredHarvesters = 4
+
+def assignSameRoomSource (location):
+    # The aim of this function is to assign a creep to a specific energy source.
+    # The first step is to identify how many creeps are already assigned to the energy souces,
+    # and to identify the need for more creeps for that specific source.
+    # print(location.memory.sourceAccessability[0],location.memory.sourceAccessability[1],location.memory.sourceAccessability[0][0],location.memory.sourceAccessability[0][1])
+    for i in range(len(location.memory.sourceAccessability)):
+        source = location.memory.sourceAccessability[i][0]
+        requiredCreeps = location.memory.sourceAccessability[i][1] * location.memory.minersPerAccessPoint
+
+        num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.source == source.id and len(c.memory.source)>0))
+        print('Source: ', str(source.id) + ', requiredCreeps: ' + str(requiredCreeps) + ' num_creeps ' + str(num_creeps))
+        for creepboi in location.find(FIND_CREEPS):
+            print(creepboi, creepboi.memory.source)
+
+        if num_creeps < requiredCreeps and requiredCreeps > -1: #added requiredCreeps > -1 to prevent undefined.
+            print ('assigned source id: ', str(source.id))
+            return source.id
 
 # example from https://docs.screeps.com/api/#PathFinder for further improvement:
   # let creep = Game.creeps.John;
