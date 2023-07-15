@@ -15,19 +15,18 @@ def run_harvester(creep):
     """
     Runs a creep as a generic harvester.
     Current issues: Creep memory does not get removed after creep death
-                    Creep target is kind of shit, but better than before
-                    Creeps are not linked to one specific mine
-
                     This error pops up when a creep was refilling energy, but now the energy source is full:
-                    TypeError: Cannot read property 'pos' of undefined
-                    at RoomPosition.inRangeTo (<runtime>:14512:20)
-                    at Object.run_harvester (main:1067:29)
-                    at Object.main (main:1156:13)
-                    at __mainLoop:1:52
-                    at __mainLoop:2:3
-                    at Object.exports.evalCode (<runtime>:15851:76)
-                    at Object.exports.run (<runtime>:46474:24)
-                    Need to add logic to select the closest construction site to the target selection.
+                        TypeError: Cannot read property 'pos' of undefined
+                        at RoomPosition.inRangeTo (<runtime>:14512:20)
+                        at Object.run_harvester (main:1067:29)
+                        at Object.main (main:1156:13)
+                        at __mainLoop:1:52
+                        at __mainLoop:2:3
+                        at Object.exports.evalCode (<runtime>:15851:76)
+                        at Object.exports.run (<runtime>:46474:24)
+
+                    Added logic for 'Need to add logic to select the closest construction site to the target selection':
+                        - this logic breaks the bot every 300-500 ticks for 1 tick. Currently defined as acceptable.
     :param creep: The creep to run
     """
 
@@ -63,50 +62,37 @@ def run_harvester(creep):
             target = Game.getObjectById(creep.memory.target)
         else:
             # Get a building site and build it
-            # print('Creep room phase: ' + str(creep.room.GamePhase) + ', roomname: ' + str (Game.rooms[creep.room.name]) + str(creep.room.name) )
-            if creep.room.memory.GamePhase == 'GameStart':
-                # First check if the spawns or extensions are empty:
-                # target = creep.room.find(FIND_STRUCTURES) \
-                #     .filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION)
-                #                        and s.energy < s.energyCapacity)
-                # if len(target) >0 :
-                #     creep.memory.target = Game.getObjectById(creep.pos.findClosestByPath(target).id)
-                #     creep.memory.job = 'Replenish'
-                #     # print(targetb)
-
-
-                target = _(creep.room.find(FIND_STRUCTURES)) \
-                                    .filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION)
-                                                       and s.energy < s.energyCapacity) \
-                                    .sample()
-                if len(target) >0 :
-                    creep.memory.target = target.id
-                    print(target.id, target.id == targetb)
+            # First check if the spawns or extensions are empty:
+            structs = creep.room.find(FIND_STRUCTURES).filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION) and s.energy < s.energyCapacity)
+            if len(structs) >0 :
+                # if there is a path to the target
+                try:
+                    a = creep.pos.findClosestByPath(structs).id
+                    creep.memory.target = a
+                    target = Game.getObjectById(a)
                     creep.memory.job = 'Replenish'
+                except Exception as e:
+                    print ('No path to target for creep: ', creep.name)
+                    pass
 
-
-                # If the spawns and extensions are full, build:
-
-                elif len(creep.room.find(FIND_CONSTRUCTION_SITES)) >0 :
-                    target = _(creep.room.find(FIND_CONSTRUCTION_SITES)) \
-                        .filter(lambda s: (s.structureType != STRUCTURE_SPAWN and s.progress >-1)) \
-                        .sample()
-                    creep.memory.target = target.id
+            elif len(creep.room.find(FIND_CONSTRUCTION_SITES)) >0 :
+                structs = creep.room.find(FIND_CONSTRUCTION_SITES)
+                # if there is a path to the target
+                try:
+                    a = creep.pos.findClosestByPath(structs).id
+                    creep.memory.target = a
+                    target = Game.getObjectById(a)
                     creep.memory.job = 'Build'
+                except Exception as e:
+                    print ('No path to target for creep: ', creep.name)
+                    pass
 
-                # something to add to find closest: creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES)
-                # elif len(creep.room.find(FIND_CONSTRUCTION_SITES)) >0 :
-                #     target = _(creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES)) \
-                #         .filter(lambda s: (s.progress >-1))
-                #     creep.memory.target = target.id
-                #     creep.memory.job = 'Build'
-                    # creep.pos.findClosestByRange(FIND_ACTIVE_SOURCES)
-
-                # Upgrade the controller
-                else:
-                    # print('Creep is to be assigned the upgrader class', + str(creep.room.controller.id))
-                    creep.memory.target = creep.room.controller.id
-                    creep.memory.job = 'Upgrade'
+            # Upgrade the controller
+            else:
+                # print('Creep is to be assigned the upgrader class', + str(creep.room.controller.id))
+                creep.memory.target = creep.room.controller.id
+                target = Game.getObjectById(creep.room.controller.id)
+                creep.memory.job = 'Upgrade'
 
 
         # print('Target progress: ' + str(target.structureType))
@@ -120,11 +106,12 @@ def run_harvester(creep):
             # If we are targeting a spawn or extension, transfer energy. Otherwise, use upgradeController on it.
             if target.energyCapacity:
                 result = creep.transfer(target, RESOURCE_ENERGY)
-                if target.energy >= target.energyCapacity or creep.carry <= 0:
-                    del creep.memory.target
-                elif result in (-7,-10):
+                if result == -7 or result == -10:
                     print("[{}] Unknown result from creep.transfer({}, {}): {}".format(
                         creep.name, target, RESOURCE_ENERGY, result))
+                    del creep.memory.target
+                else:
+                    del creep.memory.target
             elif target.structureType == 'controller':
                 result = creep.upgradeController(target)
                 if result != OK:
