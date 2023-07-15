@@ -11,46 +11,21 @@ __pragma__('noalias', 'update')
 
 
 def DetermineGamePhase (location):
-    """
-    This is the core of the bot: it is supposed to act based on the game phase.
-    Act is defined as 'spawn creeps, determine creep job composition, expand, et cetera.'
-    It currently is lacking in the following areas:
-    1. The game phases are limited
-    - we need another game phase for:
-    - 'jack of all trades == desired number' and 'no extensions built'
-    - 'jack of all trades == desired number' and 'no containers built'
-    - 'containers built'
-    - 'containers built' and 'transition to proper minion composition completed'
-    - expanding
-
-    """
+# If at the start of the game and not enough extensions have been made:
     # print('Before logic: ' + str(location.memory.GamePhase) + ' For var: ' + str(location))
     if location.memory.GamePhase == None:
         location.memory.GamePhase = 'Debug'
         location.memory.minersPerAccessPoint = 0
-
-    # not owned by me:
-    elif location.controller.my == False:
-        location.memory.GamePhase = 'UnUsed'
-
-    # If at the start of the game and not enough extensions have been made:
     elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <9 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
         location.memory.GamePhase = 'GameStart'
         location.memory.minersPerAccessPoint = 2
-        location.memory.expanding = False
-        location.memory.livingGod = False
     else:
-        # Add filter to ensure the number of rooms < maximum number of rooms.
         location.memory.GamePhase = 'ReadyToRumble'
         location.memory.minersPerAccessPoint = 2
-        location.memory.expanding = True
 
     # print(location.memory.GamePhase)
 
 def ConstructRoom (location):
-    """
-    This function is really nothing more than an empty shell.
-    """
     # Uses the GamePhase variable to determine the macro-level actions:
     if location.memory.GamePhase == 'GameStart':
         # If not yet building:
@@ -66,10 +41,8 @@ def ConstructRoom (location):
         print('GamePhase unclear.')
 
 def RoomEnergyIdentifier (location):
-    """
-    The aim of this fuction is to identify how many people could theoretically mine at the same time in one room.
-    This number is then used to determine the required number of miners at a given point in the game.
-    """
+    # The aim of this fuction is to identify how many people could theoretically mine at the same time in one room.
+    # This number is then used to determine the required number of miners at a given point in the game.
 
     sources = location.find(FIND_SOURCES)
     # print(sources)
@@ -110,15 +83,11 @@ def RoomEnergyIdentifier (location):
     location.memory.sourceAccessability = listForSourceData
 
 def identifyHarvestersNeeded (location):
-    """
-    The aim of this fuction is to determine the number of needed harvesters in a room, by using the number of access points of all of the sources as a baseline.
-    This number is then used to compare against in Main.py, to determine if new creeps have to be spawned.
-    """
+    # The aim of this fuction is to determine the number of needed harvesters in a room, by using the number of access points of all of the sources as a baseline.
+    # This number is then used to compare against in Main.py, to determine if new creeps have to be spawned.
 
-    if location.memory.GamePhase == 'UnUsed':
-        location.memory.requiredHarvesters = int(location.memory.totalAccesPoints * 0)
     # If a lot of construction still has to be done, or spawning is the main objective.
-    elif location.memory.GamePhase == 'ExtemeEarlyGame':
+    if location.memory.GamePhase == 'ExtemeEarlyGame':
         location.memory.requiredHarvesters = int(location.memory.totalAccesPoints * 1.5)
     # If the main objective is to build roads:
     elif location.memory.GamePhase == 'GameStart':
@@ -134,12 +103,9 @@ def identifyHarvestersNeeded (location):
         location.memory.requiredHarvesters = 4
 
 def assignSameRoomSource (location):
-    """
-    The aim of this function is to assign a creep to a specific energy source.
-    The first step is to identify how many creeps are already assigned to the energy souces,
-    and to identify the need for more creeps for that specific source.
-    """
-
+    # The aim of this function is to assign a creep to a specific energy source.
+    # The first step is to identify how many creeps are already assigned to the energy souces,
+    # and to identify the need for more creeps for that specific source.
     # print(location.memory.sourceAccessability[0],location.memory.sourceAccessability[1],location.memory.sourceAccessability[0][0],location.memory.sourceAccessability[0][1])
     for i in range(len(location.memory.sourceAccessability)):
         source = location.memory.sourceAccessability[i][0]
