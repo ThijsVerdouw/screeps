@@ -1,6 +1,7 @@
 import harvester
 import Strategy
 import Expansion
+import SpawnManager
 # defs is a package which claims to export all constants and some JavaScript objects, but in reality does
 #  nothing. This is useful mainly when using an editor like PyCharm, so that it 'knows' that things like Object, Creep,
 #  Game, etc. do exist.
@@ -27,36 +28,66 @@ def main():
     # Identify all living creeps: (should be improved by storing their ID's in memory and by removing or adding when spawning or dying.)
     # Current cost is about 2-3 cpu per cycle, so pretty big and pretty inefficient.
     Schutzstaffel = {'JackOfAllTrades' : [],
-                    'Reichsprotektor': []}
+                    'Builder' : [],
+                    'Miner' : [],
+                    'Transporter' : [],
+                    'Reichsprotektor': [],
+                    'Gefreiter': [],
+                    'Templar':[]
+                    }
 
     for name in Object.keys(Game.creeps):
         creep = Game.creeps[name]
         Schutzstaffel[creep.memory.designation].append(creep)
 
+    # Identify total number of living minions per role:
+    totalReichsprotektors = len(Schutzstaffel['Reichsprotektor'])
+    totalTransporters = len(Schutzstaffel['Transporter'])
+    totalBuilders = len(Schutzstaffel['Builder'])
+    totalJacks = len(Schutzstaffel['JackOfAllTrades'])
+    totalMiners = len(Schutzstaffel['Miner'])
+    totalGefreiters = len(Schutzstaffel['Gefreiter'])
+    # print('R:' + str(totalReichsprotektors) + ' - T:' + str(totalTransporters) +' - B:' + str(totalBuilders) +' - J:' + str(totalJacks) +' - M:' + str(totalMiners))
+
     # Manage each room - to be executed every 100 or so game ticks in the future.
     for location in Object.keys(Game.rooms):
+        # determine if building (to be done each tick)
+
+        Strategy.IsRoomBuilding(Game.rooms[location])
+
+        #  to be executed every 100 or so game ticks in the future.
         Strategy.DetermineGamePhase (Game.rooms[location])
         Strategy.ConstructRoom(Game.rooms[location])
 
-        # to be executed once per !game!:
+        # to be executed once per room !!per game!!:
         Strategy.RoomEnergyIdentifier (Game.rooms[location])
 
         # Executed every 1000 ticks:
-        Strategy.identifyHarvestersNeeded (Game.rooms[location])
-        Expansion.ExpansionManager (Game.rooms[location] ,Schutzstaffel['Reichsprotektor'])
-        # print(Game.rooms[location])
-
+        Expansion.ExpansionManager (Game.rooms[location] ,Schutzstaffel['Gefreiter'])
 
     # Run each creep
     try:
-
-        for creep in Schutzstaffel['JackOfAllTrades']:
-            harvester.run_harvester(creep)
-        for creep in Schutzstaffel['Reichsprotektor']:
-            Expansion.scout(creep)
-
-
-
+        if totalJacks > 0:
+            for creep in Schutzstaffel['JackOfAllTrades']:
+                harvester.JackOfAllTrades(creep)
+        if totalBuilders > 0:
+            for creep in Schutzstaffel['Builder']:
+                harvester.Run_Builder(creep)
+        if totalMiners > 0 and totalTransporters > 0:
+            for creep in Schutzstaffel['Miner']:
+                harvester.Run_miner(creep)
+        elif totalMiners > 0:
+            for creep in Schutzstaffel['Miner']:
+                harvester.JackOfAllTrades(creep)
+        if totalTransporters > 0:
+            for creep in Schutzstaffel['Transporter']:
+                harvester.Run_Hauler(creep)
+        if totalGefreiters > 0:
+            for creep in Schutzstaffel['Gefreiter']:
+                Expansion.scout(creep)
+        if totalReichsprotektors > 0:
+            for creep in Schutzstaffel['Reichsprotektor']:
+                harvester.Run_Reichsprotektor(creep)
     except Exception as e:
         print('Error while running harvesters: ' + str(e))
 
@@ -65,38 +96,38 @@ def main():
         for name in Object.keys(Game.spawns):
             spawn = Game.spawns[name]
             if not spawn.spawning:
-                # Get the number of our creeps in the room.
-                num_creeps = _.sum(Game.creeps, lambda c: c.pos.roomName == spawn.pos.roomName)
 
-                # If we do not have enough bois to mine (calculated on a room-level)
-                if num_creeps < spawn.room.memory.requiredHarvesters:
-                    # If we can afford a boi:
-                    if spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable:
-                        creep_name = 'Harvester_' + str(Game.time)
 
-                        # Temporary place for this optimal harvester code, want to have this in memory.
-                        optimal_harvester = harvester.create_balanced(spawn.room.energyCapacityAvailable)
-                        print("Spawning operation status: ", spawn.spawnCreep(optimal_harvester, creep_name, memory= {"designation":"JackOfAllTrades"}))
-                        print("for creep: ", optimal_harvester, creep_name)
-
-                    elif num_creeps == 0:
-                        creep_name = 'Harvester_' + str(Game.time)
-                        modules = [WORK, WORK, CARRY, MOVE]
-                        print("Spawning operation status: ", spawn.spawnCreep(modules, creep_name, memory= {"designation":"JackOfAllTrades"}))
-                        print("for creep: ", modules, creep_name)
-
-                elif spawn.room.memory.scoutNeeded == True and spawn.room.energyAvailable >= 50:
-                    creep_name = 'Konstantin' + str(Game.time)
-                    modules = [MOVE]
-                    result = spawn.spawnCreep(modules, creep_name, memory= {"designation":"Reichsprotektor"})
-                    print("Spawning operation status: ", result)
+                # If all creeps have died for some reason:
+                if (totalJacks + totalMiners) == 0:
+                    creep_name = 'Emergency_' + str(Game.time)
+                    modules = [WORK, WORK, CARRY, MOVE]
+                    print("Emergency spawn triggered!! ", spawn.spawnCreep(modules, creep_name, memory= {"designation":"JackOfAllTrades"}))
                     print("for creep: ", modules, creep_name)
-                    if result == 0:
-                        spawn.room.memory.scoutNeeded = False
 
+                # print (totalBuilders, spawn.room.memory.buildersNeeded)
+                if spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable:
+                    # Identify required number of minions for the room
+                    Strategy.IdentifyMinionsNeeded(spawn.room)
+                    if totalMiners == 0:
+                        SpawnManager.SpawnMiner(spawn)
+                    elif totalTransporters == 0:
+                        SpawnManager.SpawnTransporter(spawn)
+                    elif totalBuilders == 0 and totalBuilders < spawn.room.memory.buildersNeeded:
+                        SpawnManager.SpawnBuilder(spawn)
+                    elif totalMiners < spawn.room.memory.requiredHarvesters:
+                        SpawnManager.SpawnMiner(spawn)
+                    elif totalTransporters < spawn.room.memory.transportersNeeded:
+                        SpawnManager.SpawnTransporter(spawn)
+                    elif totalBuilders < spawn.room.memory.buildersNeeded:
+                        SpawnManager.SpawnBuilder(spawn)
+                    elif totalReichsprotektors < spawn.room.memory.upgradersNeeded:
+                        SpawnManager.SpawnReichsprotektor(spawn)
+                    # elif totalReichsprotektors < spawn.room.memory.buildersNeeded:
+                    #     SpawnManager.SpawnReichsprotektor(spawn)
 
-
-
+                if spawn.room.memory.scoutNeeded == True:
+                    SpawnManager.SpawnScout(spawn)
 
     except Exception as e:
         print('Error while handling spawns: ' + str(e))
