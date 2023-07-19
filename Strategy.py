@@ -17,35 +17,78 @@ def DetermineGamePhase (location):
     It currently is lacking in the following areas:
     1. The game phases are limited
     - we need another game phase for:
-    - 'jack of all trades == desired number' and 'no extensions built'
+    - 'spawning 4-6 jack of all trades and X number of remotes'
+    - 'jack of all trades + remotes == desired number' and 'RCL <2' and 'no extensions built'
     - 'jack of all trades == desired number' and 'no containers built'
     - 'containers built'
     - 'containers built' and 'transition to proper minion composition completed'
     - expanding
 
+    I also want the data from memory to be exported using this: https://github.com/screepers/screeps-multimeter
     """
     # print('Before logic: ' + str(location.memory.GamePhase) + ' For var: ' + str(location))
-    if location.memory.GamePhase == None:
-        location.memory.GamePhase = 'Debug'
-        location.memory.minersPerAccessPoint = 0
 
     # not owned by me:
-    elif location.controller.my == False:
-        location.memory.GamePhase = 'UnUsed'
+    if len(location.controller) > 0:
+        if not location.controller.my:
+            location.memory.GamePhase = 'UnUsed'
+            location.memory.building = False
 
-    # If at the start of the game and not enough extensions have been made:
-    elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <9 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
-        location.memory.GamePhase = 'GameStart'
-        location.memory.minersPerAccessPoint = 2
-        location.memory.expanding = False
-        location.memory.livingGod = False
+        # The true start of the game, no creeps:
+        elif location.controller.level <2:
+            location.memory.GamePhase = 'T0'
+            location.memory.minersPerAccessPoint = 2
+            location.memory.expanding = False
+            location.memory.remoteMining = False
+            location.memory.scoutNeeded = False
+            location.memory.TransportersPerAccesPoint = 0.5
+
+        # If at the start of the game and not enough extensions have been made:
+        elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
+            location.memory.GamePhase = 'GameStart'
+            location.memory.minersPerAccessPoint = 1
+            location.memory.expanding = False
+            location.memory.remoteMining = False
+            location.memory.scoutNeeded = False
+            location.memory.TransportersPerAccesPoint = 0.5
+
+        elif location.controller.level <3:
+            location.memory.GamePhase = 'GameStart'
+            location.memory.minersPerAccessPoint = 1
+            location.memory.expanding = False
+            location.memory.remoteMining = False
+            location.memory.scoutNeeded = False
+            location.memory.TransportersPerAccesPoint = 0.5
+
+        elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >8 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 1:
+            # Add filter to ensure the number of rooms < maximum number of rooms.
+            location.memory.GamePhase = 'ReadyToRumble'
+            location.memory.minersPerAccessPoint = 2
+            location.memory.expanding = True
+            location.memory.remoteMining = False
+            location.memory.scoutNeeded = False
+            location.memory.TransportersPerAccesPoint = 0.5
+        else:
+            location.memory.GamePhase = 'Debug'
+            location.memory.minersPerAccessPoint = 0
     else:
-        # Add filter to ensure the number of rooms < maximum number of rooms.
-        location.memory.GamePhase = 'ReadyToRumble'
-        location.memory.minersPerAccessPoint = 2
-        location.memory.expanding = True
-
+        location.memory.GamePhase = 'UnUsed'
+        location.memory.building = False
+    location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints
     # print(location.memory.GamePhase)
+
+def IsRoomBuilding(location):
+    if len(location.controller) > 0:
+        if location.controller.my:
+            if len(location.find(FIND_CONSTRUCTION_SITES)) >0:
+                location.memory.building = True
+            else:
+                location.memory.building = False
+        else:
+            location.memory.building = False
+    else:
+        location.memory.building = False
+
 
 def ConstructRoom (location):
     """
@@ -63,7 +106,8 @@ def ConstructRoom (location):
 
     # If room already contains the optimal number of extensions:
     else:
-        print('GamePhase unclear.')
+        # print('GamePhase unclear.')
+        pass
 
 def RoomEnergyIdentifier (location):
     """
@@ -109,29 +153,40 @@ def RoomEnergyIdentifier (location):
     location.memory.totalAccesPoints = totalAccesPoints
     location.memory.sourceAccessability = listForSourceData
 
-def identifyHarvestersNeeded (location):
+def IdentifyMinionsNeeded (location):
     """
-    The aim of this fuction is to determine the number of needed harvesters in a room, by using the number of access points of all of the sources as a baseline.
+    The aim of this fuction is to determine the number of needed minions in a room, by using the number of access points of all of the sources as a baseline.
     This number is then used to compare against in Main.py, to determine if new creeps have to be spawned.
     """
+    # The number of builders needed is the total number of miners, divided by 2.5. This is assuming all produced energy is used as building materials.
+    # This also assume the miners have the same number of work modules as the builders (not the case, probably?)
 
-    if location.memory.GamePhase == 'UnUsed':
-        location.memory.requiredHarvesters = int(location.memory.totalAccesPoints * 0)
-    # If a lot of construction still has to be done, or spawning is the main objective.
-    elif location.memory.GamePhase == 'ExtemeEarlyGame':
-        location.memory.requiredHarvesters = int(location.memory.totalAccesPoints * 1.5)
-    # If the main objective is to build roads:
-    elif location.memory.GamePhase == 'GameStart':
-        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 2
-    # If the main objective is to upgrade the controller
-    elif location.memory.GamePhase == 'UpgradingController':
-        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 3
-    # In the midgame we want to just have the 1 dedicated dude on one source, as they can empty it out (probably)
-    elif location.memory.GamePhase == 'ReadyToRumble':
-        location.memory.requiredHarvesters = location.memory.totalAccesPoints * 1
-    # debugging
+    if location.memory.building:
+        if round(location.memory.totalAccesPoints / 2.5) < 0:
+            location.memory.buildersNeeded = 1
+        else:
+            location.memory.buildersNeeded = round(location.memory.totalAccesPoints / 2.5)
+    # If structures need repairs:
+    elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.hits < (s.hitsMax * 0.8))) > 0:
+        location.memory.buildersNeeded = 1
     else:
-        location.memory.requiredHarvesters = 4
+        location.memory.buildersNeeded = 0
+
+    # If we are building, upgrading is not a priority.
+    if location.memory.building:
+        location.memory.upgradersNeeded = 0
+    else:
+        # The number of promoters is the sum of miners * 2.5. Again, assuming identical work modules (which is likely) and all energy is used for promotion.
+        location.memory.upgradersNeeded = round(location.memory.totalAccesPoints * 2 )
+
+    # The number of haulers would be calculated with a relatively complicated calculation:
+    # trip time = (Distance between source and dropoff point in ticks * 2) + 8). The +8 is time for refill.
+    # ticks until miner is full = carrycapacity / (work parts * 2)
+    # needed haulers = ticks until miner is full / trip time. Rounded upwards
+    location.memory.transportersNeeded = location.memory.totalAccesPoints * location.memory.TransportersPerAccesPoint # (this obviously is a placeholder)
+
+
+
 
 def assignSameRoomSource (location):
     """
@@ -153,6 +208,27 @@ def assignSameRoomSource (location):
         if num_creeps < requiredCreeps and requiredCreeps > -1: #added requiredCreeps > -1 to prevent undefined.
             print ('assigned source id: ', str(source.id))
             return source.id
+
+        # For remote mining creeps: add elif here to do the same, but with num_creeps = game.creeps.find instead of room.creeps.find
+
+def assignSameRoomPickupPoint (location):
+    """
+    Same function as above, but for haulers.
+    """
+    print('attemping to assign source for location')
+    for i in range(len(location.memory.sourceAccessability)):
+        source = location.memory.sourceAccessability[i][0]
+        requiredCreeps = location.memory.sourceAccessability[i][1] * location.memory.TransportersPerAccesPoint
+
+        num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.PickupPoint == source.id and len(c.memory.PickupPoint)>0))
+        print('Source: ', str(source.id) + ', requiredCreeps: ' + str(requiredCreeps) + ' num_creeps ' + str(num_creeps))
+        for creepboi in location.find(FIND_CREEPS):
+            print(creepboi, creepboi.memory.PickupPoint)
+
+        if num_creeps < requiredCreeps and requiredCreeps > -1: #added requiredCreeps > -1 to prevent undefined.
+            print ('assigned source id: ', str(source.id))
+            return source.id
+        # For remote mining creeps: add elif here to do the same, but with num_creeps = game.creeps.find instead of room.creeps.find
 
 # example from https://docs.screeps.com/api/#PathFinder for further improvement:
   # let creep = Game.creeps.John;
