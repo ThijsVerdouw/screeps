@@ -196,7 +196,7 @@ def collectFromLogisticsBoi (creep):
     This method of getting energy is simply: move to the current energy dropoff point and wait for someone to hand you some.
     '''
 
-    if creep.room.memory.building:
+    if creep.room.memory.building and creep.memory.designation != 'Reichsprotektor':
         if len(creep.memory.spawn) > 0:
             dropoffPoint = Game.getObjectById(creep.memory.spawn)
         else:
@@ -309,27 +309,23 @@ def CollectFromMiner (creep):
 
     # If we are near the pickup point, wait until a miner is full
     if creep.memory.WaitForMiner == True:
+        # A fix for rare cases where this dude will just stare at the miner which just spawned after he got to the point:
+        if len(creep.memory.Miners) <1:
+            creep.memory.WaitForMiner = False
+
         for miner in creep.memory.Miners:
             # If they are full, set them as your target
-            if _.sum(Game.creeps[miner].carry) >= Game.creeps[miner].carryCapacity:
+            if Game.creeps[miner] == None or len(creep.memory.Miners) <1:
+                # If the miner has died reset, rebuild the pool.
+                creep.memory.WaitForMiner = False
+
+            elif _.sum(Game.creeps[miner].carry) >= Game.creeps[miner].carryCapacity:
+                # print(creep.name + ' Creep has found a potential target: ' + Game.creeps[miner].name)
                 creep.memory.target = Game.creeps[miner].id
                 creep.memory.WaitForMiner = False
                 # Tell the miner to give you its energy.
                 Game.creeps[miner].memory.target = creep.id
                 break
-
-    # If you have a target to pick up from
-    elif len(creep.memory.target >0):
-        target = Game.getObjectById(creep.memory.target)
-        if creep.pos.isNearTo(target) == False:
-            CreepMove(creep, target)
-        # If another creep has already emptied this creeps inventory.
-        elif _.sum(target.carry) < target.carryCapacity:
-            creep.memory.WaitForMiner = False
-            del creep.memory.target
-        else:
-            creep.memory.WaitForMiner = True
-
     # If we are not even near the pickup point, move to the pickup point.
     else:
         if creep.pos.inRangeTo(PickupPoint, 2):
@@ -343,11 +339,32 @@ def CollectFromMiner (creep):
             creep.moveTo(PickupPoint)
             creep.memory.WaitForMiner = False
 
+    # print('This actually happenedxz-' + str(creep.memory.target))
+    # If you have a target to pick up from
+    if len(creep.memory.target) > 0:
+        target = Game.getObjectById(creep.memory.target)
+        # print ('moving to ' + str(target))
+        if creep.pos.isNearTo(target) == False:
+            CreepMove(creep, target)
+        # If another creep has already emptied this creeps inventory.
+        elif _.sum(target.carry) < target.carryCapacity:
+            creep.memory.WaitForMiner = False
+            del creep.memory.target
+        else:
+            target.memory.target = creep.id
+            creep.memory.WaitForMiner = True
+
+
+
 
 def TransferEnergyToWaitingTarget (creep):
     target = Game.getObjectById(creep.memory.target)
     if target.memory.AwaitingRefill == False:
         del creep.memory.target
+    # elif creep.room.memory.building == True and target.memory.designation != 'Builder':
+    #     del creep.memory.target
+    # elif creep.room.memory.building == False and target.memory.designation == 'Builder':
+    #     del creep.memory.target
     elif not creep.pos.isNearTo(target):
         CreepMove(creep, target)
     else:
@@ -387,13 +404,15 @@ def DistributeEnergy (creep):
         dropoffPoint = creep.room.controller
         appropriateDistance = 4
 
-    if not creep.pos.inRangeTo(dropoffPoint, appropriateDistance):
+    if len(creep.memory.target) > 0:
+        # print (str(creep) + 'attempting to transfer energy to awaiting target')
+        if Game.getObjectById(creep.memory.target) == None:
+            del creep.memory.target
+        else:
+            TransferEnergyToWaitingTarget(creep)
+    elif not creep.pos.inRangeTo(dropoffPoint, appropriateDistance):
         creep.moveTo(dropoffPoint)
         # print (str(creep) + 'moving to dropoff point', + str(dropoffPoint) + str(creep.pos.inRangeTo(dropoffPoint, appropriateDistance)) + str(appropriateDistance))
-
-    elif len(creep.memory.target) > 0:
-        # print (str(creep) + 'attempting to transfer energy to awaiting target')
-        TransferEnergyToWaitingTarget(creep)
 
     elif creep.room.memory.builderAwaitingRefill == True:
         # print (str(creep) + 'Setting transfer target')
@@ -463,25 +482,34 @@ def Run_Hauler(creep):
 ################################################################# Start of Miner ###########################################################################
 
 def transferEnergyToHauler (creep, target):
-    if creep.pos.isNearTo(target):
-        result = creep.transfer(target, RESOURCE_ENERGY, _.sum(creep.carry))
-        if result == -8:
-            result = creep.transfer(target, RESOURCE_ENERGY, (target.carryCapacity - _.sum(target.carry)))
-            creep.memory.filling = True
-            Mine(creep)
-            if result != 0:
-                print (str(creep.name) + ' attempted to transfer energy to ' +str (target) + str(result) + str(target.carryCapacity - _.sum(target.carry)))
-            else:
-                del target.memory.target
-                target.memory.WaitForMiner = False
+    if target == None:
+        print (str(creep.name) + ' attempted to transfer energy to a nonexisting creep.' )
+        del creep.memory.target
+    else:
+        print(str(creep.name) + creep.pos.isNearTo(target) + str(target))
+        if creep.pos.isNearTo(target):
+            result = creep.transfer(target, RESOURCE_ENERGY, _.sum(creep.carry))
+            print(result)
+            if result == -8:
+                result = creep.transfer(target, RESOURCE_ENERGY, (target.carryCapacity - _.sum(target.carry)))
                 creep.memory.filling = True
                 Mine(creep)
-        elif result != 0:
-            print (str(creep.name) + ' attempted to transfer energy to ' +str (target) + str(result) + str(_.sum(creep.carry)))
-        else:
-            del target.memory.target
-            target.memory.WaitForMiner = False
-            Mine(creep)
+                if result != 0:
+                    print (str(creep.name) + ' attempted to transfer energy to ' +str (target) + str(result) + str(target.carryCapacity - _.sum(target.carry)))
+                else:
+                    del target.memory.target
+                    del creep.memory.target
+                    target.memory.WaitForMiner = False
+                    creep.memory.filling = True
+                    Mine(creep)
+            elif result != 0:
+                print (str(creep.name) + ' attempted to transfer energy to ' +str (target) + str(result) + str(_.sum(creep.carry)))
+            else:
+                del target.memory.target
+                del creep.memory.target
+                target.memory.WaitForMiner = False
+                Mine(creep)
+
 
 def Run_miner (creep):
     '''
@@ -491,13 +519,22 @@ def Run_miner (creep):
     2. Once full, wait for a Hauler to signal 'ready for pickup'
     3. Transfer energy to the hauler.
     '''
-    CollectEnergyIfneeded(creep)
+
+    # Alt version of CollectEnergyIfneeded(creep), to deal with the JackOfAllTrades reset
+    if _.sum(creep.carry) >= creep.carryCapacity:
+        creep.memory.filling = False
+
+    # If we're empty, start filling again and remove the saved target
+    else:
+        creep.memory.filling = True
+
     if creep.memory.filling:
         # print('Creep ' + str(creep) + ' is filling')
         Mine(creep)
     elif len(creep.memory.target) > 0:
         target = Game.getObjectById(creep.memory.target)
         transferEnergyToHauler (creep, target)
+
     else :
         # Wait for the miner to get there
         pass

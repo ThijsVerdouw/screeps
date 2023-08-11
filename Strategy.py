@@ -37,11 +37,11 @@ def DetermineGamePhase (location):
         # The true start of the game, no creeps:
         elif location.controller.level <2:
             location.memory.GamePhase = 'T0'
-            location.memory.minersPerAccessPoint = 2
+            location.memory.minersPerAccessPoint = 1
             location.memory.expanding = False
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 0.5
+            location.memory.TransportersPerAccesPoint = 1
 
         # If at the start of the game and not enough extensions have been made:
         elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
@@ -50,7 +50,7 @@ def DetermineGamePhase (location):
             location.memory.expanding = False
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 0.5
+            location.memory.TransportersPerAccesPoint = 1
 
         elif location.controller.level <3:
             location.memory.GamePhase = 'GameStart'
@@ -58,7 +58,7 @@ def DetermineGamePhase (location):
             location.memory.expanding = False
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 0.5
+            location.memory.TransportersPerAccesPoint = 1
 
         elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >8 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 1:
             # Add filter to ensure the number of rooms < maximum number of rooms.
@@ -67,7 +67,7 @@ def DetermineGamePhase (location):
             location.memory.expanding = True
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 0.5
+            location.memory.TransportersPerAccesPoint = 1
         else:
             location.memory.GamePhase = 'Debug'
             location.memory.minersPerAccessPoint = 0
@@ -75,6 +75,7 @@ def DetermineGamePhase (location):
         location.memory.GamePhase = 'UnUsed'
         location.memory.building = False
     location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints
+    location.memory.MaxHarversPerSource = 2
     # print(location.memory.GamePhase)
 
 def IsRoomBuilding(location):
@@ -94,20 +95,21 @@ def ConstructRoom (location):
     """
     This function is really nothing more than an empty shell.
     """
+    pass
     # Uses the GamePhase variable to determine the macro-level actions:
-    if location.memory.GamePhase == 'GameStart':
-        # If not yet building:
-        if len(location.find(FIND_CONSTRUCTION_SITES)) == 0:
-            location.createConstructionSite(20, 19, STRUCTURE_EXTENSION)
-
-    elif location.memory.GamePhase == 'ReadyToRumble' :
-        if len(location.find(FIND_CONSTRUCTION_SITES)) == 0:
-            location.createConstructionSite(10, 15, STRUCTURE_CONTAINER)
+    # if location.memory.GamePhase == 'GameStart':
+    #     # If not yet building:
+    #     if len(location.find(FIND_CONSTRUCTION_SITES)) == 0:
+    #         location.createConstructionSite(20, 19, STRUCTURE_EXTENSION)
+    #
+    # elif location.memory.GamePhase == 'ReadyToRumble' :
+    #     if len(location.find(FIND_CONSTRUCTION_SITES)) == 0:
+    #         location.createConstructionSite(10, 15, STRUCTURE_CONTAINER)
 
     # If room already contains the optimal number of extensions:
-    else:
+    # else:
         # print('GamePhase unclear.')
-        pass
+        # pass
 
 def RoomEnergyIdentifier (location):
     """
@@ -147,7 +149,7 @@ def RoomEnergyIdentifier (location):
                 # and source.pos.x != newX and source.pos.y != newY:
                     # print('Terrain at X: ' + str(newX) + ' Y: ' + str(newY) + ' ' + str(terrain.get (newX, newY)) + ' was considered an access point' )
                     accessPoints = accessPoints + 1
-        totalAccesPoints = totalAccesPoints + accessPoints
+        totalAccesPoints = totalAccesPoints + min(accessPoints, location.memory.MaxHarversPerSource)
         listForSourceData.append([source, accessPoints])
     # print (listForSourceData)
     location.memory.totalAccesPoints = totalAccesPoints
@@ -198,7 +200,7 @@ def assignSameRoomSource (location):
     # print(location.memory.sourceAccessability[0],location.memory.sourceAccessability[1],location.memory.sourceAccessability[0][0],location.memory.sourceAccessability[0][1])
     for i in range(len(location.memory.sourceAccessability)):
         source = location.memory.sourceAccessability[i][0]
-        requiredCreeps = location.memory.sourceAccessability[i][1] * location.memory.minersPerAccessPoint
+        requiredCreeps = min(2,location.memory.sourceAccessability[i][1] * location.memory.minersPerAccessPoint)
 
         num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.source == source.id and len(c.memory.source)>0))
         print('Source: ', str(source.id) + ', requiredCreeps: ' + str(requiredCreeps) + ' num_creeps ' + str(num_creeps))

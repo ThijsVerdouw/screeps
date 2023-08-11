@@ -87,7 +87,10 @@ def main():
                 Expansion.scout(creep)
         if totalReichsprotektors > 0:
             for creep in Schutzstaffel['Reichsprotektor']:
-                harvester.Run_Reichsprotektor(creep)
+                if creep.room.memory.building == True:
+                    harvester.Run_Builder(creep)
+                else:
+                    harvester.Run_Reichsprotektor(creep)
     except Exception as e:
         print('Error while running harvesters: ' + str(e))
 
@@ -113,10 +116,11 @@ def main():
                         SpawnManager.SpawnMiner(spawn)
                     elif totalTransporters == 0:
                         SpawnManager.SpawnTransporter(spawn)
-                    elif totalBuilders == 0 and totalBuilders < spawn.room.memory.buildersNeeded:
-                        SpawnManager.SpawnBuilder(spawn)
                     elif totalMiners < spawn.room.memory.requiredHarvesters:
-                        SpawnManager.SpawnMiner(spawn)
+                        if totalTransporters < (totalMiners * 0.5) and totalTransporters < spawn.room.memory.transportersNeeded:
+                            SpawnManager.SpawnTransporter(spawn)
+                        else:
+                            SpawnManager.SpawnMiner(spawn)
                     elif totalTransporters < spawn.room.memory.transportersNeeded:
                         SpawnManager.SpawnTransporter(spawn)
                     elif totalBuilders < spawn.room.memory.buildersNeeded:
