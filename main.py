@@ -87,10 +87,7 @@ def main():
                 Expansion.scout(creep)
         if totalReichsprotektors > 0:
             for creep in Schutzstaffel['Reichsprotektor']:
-                if creep.room.memory.building == True:
-                    harvester.Run_Builder(creep)
-                else:
-                    harvester.Run_Reichsprotektor(creep)
+                harvester.Run_Reichsprotektor(creep)
     except Exception as e:
         print('Error while running harvesters: ' + str(e))
 
