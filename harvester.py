@@ -486,10 +486,10 @@ def transferEnergyToHauler (creep, target):
         print (str(creep.name) + ' attempted to transfer energy to a nonexisting creep.' )
         del creep.memory.target
     else:
-        print(str(creep.name) + creep.pos.isNearTo(target) + str(target))
+        # print(str(creep.name) + creep.pos.isNearTo(target) + str(target))
         if creep.pos.isNearTo(target):
             result = creep.transfer(target, RESOURCE_ENERGY, _.sum(creep.carry))
-            print(result)
+            # print(result)
             if result == -8:
                 result = creep.transfer(target, RESOURCE_ENERGY, (target.carryCapacity - _.sum(target.carry)))
                 creep.memory.filling = True
