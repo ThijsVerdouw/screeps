@@ -66,30 +66,25 @@ def SpawnReichsprotektor (spawn):
 def create_transporter(room_capacity):
     modules = []
     if room_capacity == 300:
-        modules = [CARRY, CARRY, MOVE, MOVE]
+        modules = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE]
     else:
         # The amount of carry = amount of carry on a miner * 2
         # each full set of parts costs 2 move = 100 + 2 carry = 100, sum = 200.
         # But these are adjusted to miner carry *2, so I'm only spending 200 per 300 available energy.
-        # full_sets = int(room_capacity/300)
-        # for i in range(int(room_capacity/300)): #int rounds down
-        #     modules.append(CARRY)
-        #     modules.append(CARRY)
-        #     modules.append(MOVE)
-        #     modules.append(MOVE)
-        # if (room_capacity - (full_sets * 300)) >=200:
-        #     modules.append(MOVE)
-        #     modules.append(CARRY)
+        full_sets = int(room_capacity/100)
+        for i in range(int(room_capacity/100)): #int rounds down
+            modules.append(CARRY)
+            modules.append(MOVE)
 
         # V2: (assumes roads)
-            full_sets = int(room_capacity/150)
-            for i in range(full_sets): #int rounds down
-                modules.append(CARRY)
-                modules.append(CARRY)
-                modules.append(MOVE)
-            if (room_capacity - (full_sets * 150)) == 100:
-                modules.append(MOVE)
-                modules.append(CARRY)
+            # full_sets = int(room_capacity/150)
+            # for i in range(full_sets): #int rounds down
+            #     modules.append(CARRY)
+            #     modules.append(CARRY)
+            #     modules.append(MOVE)
+            # if (room_capacity - (full_sets * 150)) == 100:
+            #     modules.append(MOVE)
+            #     modules.append(CARRY)
     modules.sort()
     return modules
 

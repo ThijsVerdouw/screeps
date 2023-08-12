@@ -42,6 +42,7 @@ def DetermineGamePhase (location):
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
             location.memory.TransportersPerAccesPoint = 1
+            location.memory.MaxHarversPerSource = 2
 
         # If at the start of the game and not enough extensions have been made:
         elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
@@ -51,6 +52,7 @@ def DetermineGamePhase (location):
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
             location.memory.TransportersPerAccesPoint = 1
+            location.memory.MaxHarversPerSource = 2
 
         elif location.controller.level <3:
             location.memory.GamePhase = 'GameStart'
@@ -59,6 +61,7 @@ def DetermineGamePhase (location):
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
             location.memory.TransportersPerAccesPoint = 1
+            location.memory.MaxHarversPerSource = 2
 
         elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >8 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 1:
             # Add filter to ensure the number of rooms < maximum number of rooms.
@@ -68,6 +71,7 @@ def DetermineGamePhase (location):
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
             location.memory.TransportersPerAccesPoint = 1
+            location.memory.MaxHarversPerSource = 1
         else:
             location.memory.GamePhase = 'Debug'
             location.memory.minersPerAccessPoint = 0
@@ -144,12 +148,13 @@ def RoomEnergyIdentifier (location):
                 # terrain = 0 means plains.
                 # The and statement here is clunky but it works
                 # print('Terrain at X: ' + str(newX) + ' Y: ' + str(newY) + ' ' + str(terrain.get (newX, newY)))
-                if terrain.get(newX,newY) == 0 :
+                if terrain.get(newX,newY) == 0 or terrain.get(newX,newY) == 2:
                 # Nice code to disable seeing the source itself, not needed because sources are in walls:
                 # and source.pos.x != newX and source.pos.y != newY:
                     # print('Terrain at X: ' + str(newX) + ' Y: ' + str(newY) + ' ' + str(terrain.get (newX, newY)) + ' was considered an access point' )
-                    accessPoints = accessPoints + 1
-        totalAccesPoints = totalAccesPoints + min(accessPoints, location.memory.MaxHarversPerSource)
+                    accessPoints = min(accessPoints + 1, location.memory.MaxHarversPerSource)
+                    # print('We now have this many access points: ' + str(accessPoints))
+        totalAccesPoints = totalAccesPoints + accessPoints
         listForSourceData.append([source, accessPoints])
     # print (listForSourceData)
     location.memory.totalAccesPoints = totalAccesPoints
@@ -200,7 +205,7 @@ def assignSameRoomSource (location):
     # print(location.memory.sourceAccessability[0],location.memory.sourceAccessability[1],location.memory.sourceAccessability[0][0],location.memory.sourceAccessability[0][1])
     for i in range(len(location.memory.sourceAccessability)):
         source = location.memory.sourceAccessability[i][0]
-        requiredCreeps = min(2,location.memory.sourceAccessability[i][1] * location.memory.minersPerAccessPoint)
+        requiredCreeps = min(2,location.memory.sourceAccessability[i][1]) * location.memory.minersPerAccessPoint
 
         num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.source == source.id and len(c.memory.source)>0))
         print('Source: ', str(source.id) + ', requiredCreeps: ' + str(requiredCreeps) + ' num_creeps ' + str(num_creeps))
@@ -220,7 +225,7 @@ def assignSameRoomPickupPoint (location):
     print('attemping to assign source for location')
     for i in range(len(location.memory.sourceAccessability)):
         source = location.memory.sourceAccessability[i][0]
-        requiredCreeps = location.memory.sourceAccessability[i][1] * location.memory.TransportersPerAccesPoint
+        requiredCreeps =  min(location.memory.MaxHarversPerSource, location.memory.sourceAccessability[i][1]) * location.memory.TransportersPerAccesPoint
 
         num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.PickupPoint == source.id and len(c.memory.PickupPoint)>0))
         print('Source: ', str(source.id) + ', requiredCreeps: ' + str(requiredCreeps) + ' num_creeps ' + str(num_creeps))
