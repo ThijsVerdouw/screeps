@@ -169,10 +169,10 @@ def IdentifyMinionsNeeded (location):
     # This also assume the miners have the same number of work modules as the builders (not the case, probably?)
 
     if location.memory.building:
-        if round(location.memory.totalAccesPoints / 2.5) < 0:
+        if round(location.memory.totalAccesPoints / 1.5) < 0:
             location.memory.buildersNeeded = 1
         else:
-            location.memory.buildersNeeded = round(location.memory.totalAccesPoints / 2.5)
+            location.memory.buildersNeeded = round(location.memory.requiredHarvesters / 1.5)
     # If structures need repairs:
     elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.hits < (s.hitsMax * 0.8))) > 0:
         location.memory.buildersNeeded = 1
@@ -181,16 +181,16 @@ def IdentifyMinionsNeeded (location):
 
     # If we are building, upgrading is not a priority.
     if location.memory.building:
-        location.memory.upgradersNeeded = 0
+        location.memory.upgradersNeeded = 1
     else:
         # The number of promoters is the sum of miners * 2.5. Again, assuming identical work modules (which is likely) and all energy is used for promotion.
-        location.memory.upgradersNeeded = round(location.memory.totalAccesPoints * 2 )
+        location.memory.upgradersNeeded = round(location.memory.requiredHarvesters * 2 )
 
     # The number of haulers would be calculated with a relatively complicated calculation:
     # trip time = (Distance between source and dropoff point in ticks * 2) + 8). The +8 is time for refill.
     # ticks until miner is full = carrycapacity / (work parts * 2)
     # needed haulers = ticks until miner is full / trip time. Rounded upwards
-    location.memory.transportersNeeded = location.memory.totalAccesPoints * location.memory.TransportersPerAccesPoint # (this obviously is a placeholder)
+    location.memory.transportersNeeded = location.memory.requiredHarvesters * location.memory.TransportersPerAccesPoint # (this obviously is a placeholder)
 
 
 
