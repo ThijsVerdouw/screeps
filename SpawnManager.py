@@ -84,7 +84,9 @@ def create_midgame_transporter (room_capacity):
         modules.append(MOVE)
         modules.append(CARRY)
     modules.sort()
-    
+    # print('RC: ' + str( room_capacity) + 'Mods:' + str(modules))
+    return modules
+
 def create_transporter(room_capacity):
     modules = []
     if room_capacity == 300:

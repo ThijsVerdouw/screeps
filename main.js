@@ -2,7 +2,7 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:25
+// Transcrypt'ed from Python, 2023-08-22 10:57:42
 var __name__ = 'org.transcrypt.__runtime__';
 
 function __nest__ (headObject, tailNames, value) {
@@ -1065,7 +1065,39 @@ var __terminal__ = __Terminal__ ();
 var print = __terminal__.print;
 __terminal__.input;
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:26
+// Transcrypt'ed from Python, 2023-08-22 10:57:43
+var IdentifyThreats = function (location) {
+	if (len (location.controller) > 0) {
+		if (location.controller.my) {
+			var hostiles = location.find (FIND_HOSTILE_CREEPS);
+			if (len (hostiles) > 0) {
+				location.memory.FightMode = true;
+				var staticDefenses = location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+					return s.structureType == STRUCTURE_TOWER;
+				}));
+				if (len (staticDefenses) > 0) {
+					for (var tower of staticDefenses) {
+						tower.attack (tower.pos.findClosestByRange (hostiles));
+					}
+				}
+				else {
+					location.controller.activateSafeMode ();
+					// pass;
+				}
+			}
+			else {
+				location.memory.FightMode = false;
+			}
+		}
+	}
+};
+
+var __module_combat__ = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    IdentifyThreats: IdentifyThreats
+});
+
+// Transcrypt'ed from Python, 2023-08-22 10:57:43
 var SpawnCreep = function (spawn, name, modules, Memory) {
 	if (spawn.room.energyAvailable >= spawn.room.energyCapacityAvailable) {
 		spawn.spawnCreep (modules, name, __kwargtrans__ ({memory: Memory}));
@@ -1099,14 +1131,23 @@ var SpawnBuilder = function (spawn) {
 };
 var SpawnTransporter = function (spawn) {
 	var creep_name = 'Transporter_' + str (Game.time);
-	var modules = create_transporter (spawn.room.energyCapacityAvailable);
+	if (spawn.room.memory.GamePhase < 3) {
+		var modules = create_transporter (spawn.room.energyCapacityAvailable);
+	}
+	else {
+		var modules = create_midgame_transporter (spawn.room.energyCapacityAvailable);
+	}
 	var Memory = {['designation']: 'Transporter'};
 	SpawnCreep (spawn, creep_name, modules, Memory);
 };
 var SpawnMiner = function (spawn) {
 	var creep_name = 'Simon_' + str (Game.time);
-	print (spawn.room.energyAvailable);
-	var modules = create_miner (spawn.room.energyCapacityAvailable);
+	if (spawn.room.memory.GamePhase < 3) {
+		var modules = create_miner (spawn.room.energyCapacityAvailable);
+	}
+	else {
+		var modules = create_midgame_miner (spawn.room.energyCapacityAvailable);
+	}
 	var Memory = {['designation']: 'Miner'};
 	SpawnCreep (spawn, creep_name, modules, Memory);
 };
@@ -1116,23 +1157,45 @@ var SpawnReichsprotektor = function (spawn) {
 	var Memory = {['designation']: 'Reichsprotektor'};
 	SpawnCreep (spawn, creep_name, modules, Memory);
 };
+var create_midgame_transporter = function (room_capacity) {
+	var modules = [];
+	var full_sets = int (room_capacity / 150);
+	for (var i = 0; i < full_sets; i++) {
+		modules.append (CARRY);
+		modules.append (CARRY);
+		modules.append (MOVE);
+	}
+	if (room_capacity - full_sets * 150 == 100) {
+		modules.append (MOVE);
+		modules.append (CARRY);
+	}
+	modules.py_sort ();
+	return modules;
+};
 var create_transporter = function (room_capacity) {
 	var modules = [];
 	if (room_capacity == 300) {
-		var modules = [CARRY, CARRY, MOVE, MOVE];
+		var modules = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
 	}
 	else {
-		var full_sets = int (room_capacity / 150);
-		for (var i = 0; i < full_sets; i++) {
-			modules.append (CARRY);
+		int (room_capacity / 100);
+		for (var i = 0; i < int (room_capacity / 100); i++) {
 			modules.append (CARRY);
 			modules.append (MOVE);
-		}
-		if (room_capacity - full_sets * 150 == 100) {
-			modules.append (MOVE);
-			modules.append (CARRY);
 		}
 	}
+	modules.py_sort ();
+	return modules;
+};
+var create_midgame_miner = function (room_capacity) {
+	var modules = [];
+	var room_capacity = room_capacity - 100;
+	var full_sets = min (int (room_capacity / 100), 6);
+	for (var i = 0; i < full_sets; i++) {
+		modules.append (WORK);
+	}
+	modules.append (CARRY);
+	modules.append (MOVE);
 	modules.py_sort ();
 	return modules;
 };
@@ -1188,12 +1251,14 @@ var __module_SpawnManager__ = /*#__PURE__*/Object.freeze({
     SpawnTransporter: SpawnTransporter,
     SpawnMiner: SpawnMiner,
     SpawnReichsprotektor: SpawnReichsprotektor,
+    create_midgame_transporter: create_midgame_transporter,
     create_transporter: create_transporter,
+    create_midgame_miner: create_midgame_miner,
     create_miner: create_miner,
     create_balanced: create_balanced
 });
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:26
+// Transcrypt'ed from Python, 2023-08-22 10:57:43
 var ExpansionManager = function (location, scouts) {
 	if (location.memory.expanding == true) {
 		if (len (scouts) == 0) {
@@ -1205,7 +1270,7 @@ var ExpansionManager = function (location, scouts) {
 var MoveToTargetRoom = function (creep, targetRoom) {
 	print ((('Attempting to move creep: ' + str (creep)) + ' to room: ') + str (targetRoom));
 	if (creep.memory.route == undefined) {
-		print ('a');
+		print ('Creep tried to move to a different room without having a route');
 		var route = Game.map.findRoute (creep.room, targetRoom);
 		print (('route = ' + str (route)) + str (len (route)));
 		creep.memory.route = route;
@@ -1252,64 +1317,54 @@ var __module_Expansion__ = /*#__PURE__*/Object.freeze({
     crusadeToUnclaimedController: crusadeToUnclaimedController
 });
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:26
+// Transcrypt'ed from Python, 2023-08-22 10:57:44
 var DetermineGamePhase = function (location) {
 	if (len (location.controller) > 0) {
 		if (!(location.controller.my)) {
-			location.memory.GamePhase = 'UnUsed';
+			location.memory.GamePhase = 0;
 			location.memory.building = false;
 		}
 		else if (location.controller.level < 2) {
-			location.memory.GamePhase = 'T0';
+			location.memory.GamePhase = 1;
 			location.memory.minersPerAccessPoint = 1;
 			location.memory.expanding = false;
 			location.memory.remoteMining = false;
 			location.memory.scoutNeeded = false;
 			location.memory.TransportersPerAccesPoint = 1;
+			location.memory.MaxHarversPerSource = 2;
 		}
-		else if (_.sum (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		else if (len (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
 			return s.structureType == STRUCTURE_EXTENSION;
-		}))) < 5 && _.sum (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		}))) < 5) {
+			location.memory.GamePhase = 2;
+		}
+		else if (len (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
 			return s.structureType == STRUCTURE_CONTAINER;
-		}))) < 2) {
-			location.memory.GamePhase = 'GameStart';
-			location.memory.minersPerAccessPoint = 1;
-			location.memory.expanding = false;
-			location.memory.remoteMining = false;
-			location.memory.scoutNeeded = false;
-			location.memory.TransportersPerAccesPoint = 1;
+		}))) > 2) {
+			location.memory.GamePhase = 3;
+			location.memory.MaxHarversPerSource = 1;
 		}
-		else if (location.controller.level < 3) {
-			location.memory.GamePhase = 'GameStart';
-			location.memory.minersPerAccessPoint = 1;
-			location.memory.expanding = false;
-			location.memory.remoteMining = false;
-			location.memory.scoutNeeded = false;
-			location.memory.TransportersPerAccesPoint = 1;
-		}
-		else if (_.sum (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		else if (len (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
 			return s.structureType == STRUCTURE_EXTENSION;
-		}))) > 8 && _.sum (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		}))) >= 8 && len (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
 			return s.structureType == STRUCTURE_CONTAINER;
-		}))) > 1) {
-			location.memory.GamePhase = 'ReadyToRumble';
-			location.memory.minersPerAccessPoint = 2;
+		}))) > 2) {
+			location.memory.GamePhase = 4;
+			location.memory.MaxHarversPerSource = 1;
 			location.memory.expanding = true;
-			location.memory.remoteMining = false;
-			location.memory.scoutNeeded = false;
-			location.memory.TransportersPerAccesPoint = 1;
+			location.memory.remoteMining = true;
 		}
 		else {
-			location.memory.GamePhase = 'Debug';
-			location.memory.minersPerAccessPoint = 0;
+			location.memory.GamePhase = 420;
 		}
 	}
 	else {
-		location.memory.GamePhase = 'UnUsed';
+		location.memory.GamePhase = -(1);
 		location.memory.building = false;
 	}
-	location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints;
-	location.memory.MaxHarversPerSource = 2;
+	if (location.memory.GamePhase > 0) {
+		location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints;
+	}
 };
 var IsRoomBuilding = function (location) {
 	if (len (location.controller) > 0) {
@@ -1346,24 +1401,24 @@ var RoomEnergyIdentifier = function (location) {
 			var newX = (x - xChange) + 1;
 			for (var yChange = 0; yChange < 3; yChange++) {
 				var newY = (y - yChange) + 1;
-				if (terrain.get (newX, newY) == 0) {
-					var accessPoints = accessPoints + 1;
+				if (terrain.get (newX, newY) == 0 || terrain.get (newX, newY) == 2) {
+					var accessPoints = min (accessPoints + 1, location.memory.MaxHarversPerSource);
 				}
 			}
 		}
-		var totalAccesPoints = totalAccesPoints + min (accessPoints, location.memory.MaxHarversPerSource);
-		listForSourceData.append ([source, accessPoints]);
+		var totalAccesPoints = totalAccesPoints + accessPoints;
+		listForSourceData.append ([source.id, accessPoints]);
 	}
 	location.memory.totalAccesPoints = totalAccesPoints;
 	location.memory.sourceAccessability = listForSourceData;
 };
 var IdentifyMinionsNeeded = function (location) {
 	if (location.memory.building) {
-		if (round (location.memory.totalAccesPoints / 2.5) < 0) {
+		if (round (location.memory.totalAccesPoints / 1.5) < 0) {
 			location.memory.buildersNeeded = 1;
 		}
 		else {
-			location.memory.buildersNeeded = round (location.memory.totalAccesPoints / 2.5);
+			location.memory.buildersNeeded = round (location.memory.requiredHarvesters / 1.5);
 		}
 	}
 	else if (len (location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
@@ -1375,17 +1430,17 @@ var IdentifyMinionsNeeded = function (location) {
 		location.memory.buildersNeeded = 0;
 	}
 	if (location.memory.building) {
-		location.memory.upgradersNeeded = 0;
+		location.memory.upgradersNeeded = 1;
 	}
 	else {
-		location.memory.upgradersNeeded = round (location.memory.totalAccesPoints * 2);
+		location.memory.upgradersNeeded = int (location.memory.requiredHarvesters * 2);
 	}
-	location.memory.transportersNeeded = location.memory.totalAccesPoints * location.memory.TransportersPerAccesPoint;
+	location.memory.transportersNeeded = int (location.memory.requiredHarvesters * 1.5);
 };
 var assignSameRoomSource = function (location) {
 	for (var i = 0; i < len (location.memory.sourceAccessability); i++) {
-		var source = location.memory.sourceAccessability [i] [0];
-		var requiredCreeps = min (2, location.memory.sourceAccessability [i] [1] * location.memory.minersPerAccessPoint);
+		var source = Game.getObjectById (location.memory.sourceAccessability [i] [0]);
+		var requiredCreeps = min (2, location.memory.sourceAccessability [i] [1]) * location.memory.minersPerAccessPoint;
 		var num_creeps = len (location.find (FIND_CREEPS).filter ((function __lambda__ (c) {
 			return c.memory.source == source.id && len (c.memory.source) > 0;
 		})));
@@ -1402,8 +1457,8 @@ var assignSameRoomSource = function (location) {
 var assignSameRoomPickupPoint = function (location) {
 	print ('attemping to assign source for location');
 	for (var i = 0; i < len (location.memory.sourceAccessability); i++) {
-		var source = location.memory.sourceAccessability [i] [0];
-		var requiredCreeps = location.memory.sourceAccessability [i] [1] * location.memory.TransportersPerAccesPoint;
+		var source = Game.getObjectById (location.memory.sourceAccessability [i] [0]);
+		var requiredCreeps = min (location.memory.MaxHarversPerSource, location.memory.sourceAccessability [i] [1]) * location.memory.TransportersPerAccesPoint;
 		var num_creeps = len (location.find (FIND_CREEPS).filter ((function __lambda__ (c) {
 			return c.memory.PickupPoint == source.id && len (c.memory.PickupPoint) > 0;
 		})));
@@ -1417,6 +1472,39 @@ var assignSameRoomPickupPoint = function (location) {
 		}
 	}
 };
+var GetClosestContainer = function (containers, target, acceptableDistance) {
+	for (var container of containers) {
+		if (container.pos.inRangeTo (target, acceptableDistance)) {
+			var result = container.id;
+		}
+	}
+	if (result == null) {
+		print ('Error in allocating source for: ' + str (target.name));
+	}
+	return result;
+};
+var AllocateContainers = function (location) {
+	var containers = location.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		return s.structureType == STRUCTURE_CONTAINER;
+	}));
+	if (len (containers) >= 2 + len (location.memory.sourceNr)) {
+		var sourceContainers = [];
+		for (var i = 0; i < len (location.memory.sourceAccessability); i++) {
+			var source = Game.getObjectById (location.memory.sourceAccessability [i] [0]);
+			sourceContainers.append (GetClosestContainer (containers, source, 2));
+		}
+		location.memory.sourceContainers = sourceContainers;
+		location.memory.controllerContainer = GetClosestContainer (containers, location.controller, 3);
+		var spawn = location.find (FIND_MY_SPAWNS);
+		if (len (spawn) > 0) {
+			var spawn = spawn [0];
+		}
+		else {
+			print ('Error in finding spawn');
+		}
+		location.memory.spawnContainer = GetClosestContainer (containers, spawn, 1);
+	}
+};
 
 var __module_Strategy__ = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -1426,10 +1514,12 @@ var __module_Strategy__ = /*#__PURE__*/Object.freeze({
     RoomEnergyIdentifier: RoomEnergyIdentifier,
     IdentifyMinionsNeeded: IdentifyMinionsNeeded,
     assignSameRoomSource: assignSameRoomSource,
-    assignSameRoomPickupPoint: assignSameRoomPickupPoint
+    assignSameRoomPickupPoint: assignSameRoomPickupPoint,
+    GetClosestContainer: GetClosestContainer,
+    AllocateContainers: AllocateContainers
 });
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:26
+// Transcrypt'ed from Python, 2023-08-22 10:57:44
 var Strategy$1 = {};
 __nest__ (Strategy$1, '', __module_Strategy__);
 var CollectEnergyIfneeded = function (creep) {
@@ -1460,9 +1550,15 @@ var Mine = function (creep) {
 	}
 };
 var FindRefillTarget = function (creep) {
+	var towers = creep.room.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		return s.structureType == STRUCTURE_TOWER && s.energy < s.energyCapacity;
+	}));
 	var structs = creep.room.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
 		return (s.structureType == STRUCTURE_SPAWN || s.structureType == STRUCTURE_EXTENSION) && s.energy < s.energyCapacity;
 	}));
+	if (len (towers) > 0) {
+		var structs = towers;
+	}
 	if (len (structs) > 0) {
 		try {
 			var a = creep.pos.findClosestByPath (structs).id;
@@ -1487,27 +1583,15 @@ var FindRefillTarget = function (creep) {
 };
 var FindBuildTarget = function (creep) {
 	var structs = creep.room.find (FIND_CONSTRUCTION_SITES);
-	print (structs);
-	if (len (structs) > 0) {
-		try {
-			var a = creep.pos.findClosestByPath (structs).id;
-			creep.memory.target = a;
-			var target = Game.getObjectById (a);
-			creep.memory.job = 'Build';
-			return true;
-		}
-		catch (__except0__) {
-			if (isinstance (__except0__, Exception)) {
-				print ('No path to target for creep: ', creep.name);
-				return false;
-				// pass;
-			}
-			else {
-				throw __except0__;
-			}
-		}
+	if (structs != null && creep.pos.findClosestByPath (structs) != null) {
+		var a = creep.pos.findClosestByPath (structs).id;
+		creep.memory.target = a;
+		Game.getObjectById (a);
+		creep.memory.job = 'Build';
+		return true;
 	}
 	else {
+		print ('No path to target for creep: ', creep.name);
 		return false;
 	}
 };
@@ -1536,7 +1620,10 @@ var CreepMove = function (creep, target) {
 	}
 };
 var Replenish = function (creep, target) {
-	var result = creep.transfer (target, RESOURCE_ENERGY);
+	var amountToBeDeposited = _.sum (creep.carry);
+	var roomAvailable = target.store.getFreeCapacity;
+	var amountToBeDeposited = min (amountToBeDeposited, roomAvailable);
+	var result = creep.transfer (target, RESOURCE_ENERGY, amountToBeDeposited);
 	if (result == -(7) || result == -(10)) {
 		print ('[{}] Unknown result from creep.transfer({}, {}): {}'.format (creep.name, target, RESOURCE_ENERGY, result));
 		delete creep.memory.target;
@@ -1663,10 +1750,7 @@ var setTarget_Builder = function (creep) {
 		Game.getObjectById (creep.memory.target);
 	}
 	else if (FindBuildTarget (creep)) ;
-	else if (FindRepairTarget (creep)) {
-		print (('Creep ' + str (creep.memory.target)) + ' is repairing');
-		// pass;
-	}
+	else if (FindRepairTarget (creep)) ;
 	else {
 		FindUpgradeTarget (creep);
 	}
@@ -1675,6 +1759,44 @@ var Run_Builder = function (creep) {
 	CollectEnergyIfneeded (creep);
 	if (creep.memory.filling) {
 		collectFromLogisticsBoi (creep);
+	}
+	else if (len (creep.memory.target) > 0) {
+		var target = Game.getObjectById (creep.memory.target);
+		if (target === null) {
+			delete creep.memory.target;
+		}
+		if (creep.memory.AwaitingRefill) {
+			creep.memory.AwaitingRefill = false;
+		}
+		if (creep.pos.inRangeTo (target, 3)) {
+			if (creep.memory.job == 'Build') {
+				Build (creep, target);
+			}
+			else if (creep.memory.job == 'Repair') {
+				Repair (creep, target);
+			}
+			else {
+				Upgrade (creep, target);
+			}
+		}
+		else {
+			CreepMove (creep, target);
+		}
+	}
+	else {
+		setTarget_Builder (creep);
+	}
+};
+var Run_Builder_midgame = function (creep) {
+	CollectEnergyIfneeded (creep);
+	if (creep.memory.filling) {
+		if (creep.memory.WithdrawTarget == null) {
+			creep.memory.WithdrawTarget = creep.room.memory.controllerContainer;
+			collectFromSourceContainer (creep);
+		}
+		else {
+			collectFromSourceContainer (creep);
+		}
 	}
 	else if (len (creep.memory.target) > 0) {
 		var target = Game.getObjectById (creep.memory.target);
@@ -1880,41 +2002,190 @@ var Run_Hauler = function (creep) {
 		creep.memory.WaitForMiner = false;
 	}
 };
+var WithdrawFromContainer = function (creep, target) {
+	var amountToBeWithdrawn = creep.carryCapacity - _.sum (creep.carry);
+	var energyAvailable = target.store.getUsedCapacity (RESOURCE_ENERGY);
+	var amountToBeWithdrawn = min (amountToBeWithdrawn, energyAvailable);
+	if (amountToBeWithdrawn == 0) {
+		delete creep.memory.WithdrawTarget;
+	}
+	else {
+		var result = creep.withdraw (target, RESOURCE_ENERGY, amountToBeWithdrawn);
+		if (result == 0) {
+			delete creep.memory.WithdrawTarget;
+		}
+		else if (result < -(5)) {
+			print (((((creep.name + ' Failed to withdrawn energy from ') + str (target.id)) + str (result)) + ' , contained this much energy: ') + str (energyAvailable));
+			delete creep.memory.WithdrawTarget;
+		}
+	}
+};
+var collectFromSourceContainer = function (creep) {
+	if (creep.memory.WithdrawTarget == null) {
+		for (var i of creep.room.memory.sourceContainers) {
+			var container = Game.getObjectById (i);
+			if (container.store.getUsedCapacity (RESOURCE_ENERGY) >= creep.carryCapacity) {
+				creep.memory.WithdrawTarget = container.id;
+				break;
+			}
+		}
+	}
+	var target = Game.getObjectById (creep.memory.WithdrawTarget);
+	if (target == null) {
+		delete creep.memory.WithdrawTarget;
+	}
+	else if (!(creep.pos.isNearTo (target))) {
+		CreepMove (creep, target);
+		if (creep.pos.isNearTo (target)) {
+			WithdrawFromContainer (creep, target);
+		}
+	}
+	else {
+		WithdrawFromContainer (creep, target);
+	}
+};
+var PickDropoffContainer = function (creep) {
+	if (creep.memory.target == null) {
+		var container = Game.getObjectById (creep.room.memory.spawnContainer);
+		if (container.store.getFreeCapacity (RESOURCE_ENERGY) <= 0) {
+			var container = Game.getObjectById (creep.room.memory.controllerContainer);
+			if (container.store.getFreeCapacity (RESOURCE_ENERGY) <= 0) ;
+			else {
+				creep.memory.target = container.id;
+				if (!(creep.pos.isNearTo (container))) {
+					CreepMove (creep, container);
+				}
+				else {
+					Replenish (creep, target);
+				}
+			}
+		}
+		else {
+			creep.memory.target = container.id;
+			if (!(creep.pos.isNearTo (container))) {
+				CreepMove (creep, container);
+			}
+			else {
+				Replenish (creep, target);
+			}
+		}
+	}
+};
+var DepositIntoContainer = function (creep, target) {
+	if (creep.pos.isNearTo (target)) {
+		Replenish (creep, target);
+	}
+	else {
+		CreepMove (creep, target);
+		if (creep.pos.isNearTo (target)) {
+			Replenish (creep, target);
+		}
+	}
+};
+var SetHaulerJobMidgame = function (creep) {
+	if (FindRefillTarget (creep)) {
+		creep.memory.job = 'Replenish';
+	}
+	else {
+		creep.memory.job = 'ContainerRefill';
+	}
+};
+var Run_Hauler_midgame = function (creep) {
+	CollectEnergyIfneeded (creep);
+	if (creep.memory.filling) {
+		collectFromSourceContainer (creep);
+	}
+	else if (len (creep.memory.job) > 0) {
+		if (creep.memory.job == 'Replenish') {
+			if (len (creep.memory.target) > 0) {
+				var target = Game.getObjectById (creep.memory.target);
+				if (creep.pos.isNearTo (target)) {
+					Replenish (creep, target);
+				}
+				else {
+					CreepMove (creep, target);
+				}
+			}
+			else if (FindRefillTarget (creep)) ;
+			else {
+				delete creep.memory.job;
+			}
+		}
+		else if (creep.memory.job == 'ContainerRefill') {
+			if (len (creep.memory.target) > 0) {
+				var target = Game.getObjectById (creep.memory.target);
+				DepositIntoContainer (creep, target);
+			}
+			else if (PickDropoffContainer (creep)) ;
+			else {
+				delete creep.memory.job;
+			}
+		}
+		else {
+			delete creep.memory.job;
+		}
+	}
+	else {
+		SetHaulerJobMidgame (creep);
+	}
+};
 var transferEnergyToHauler = function (creep, target) {
 	if (target == null) {
 		print (str (creep.name) + ' attempted to transfer energy to a nonexisting creep.');
 		delete creep.memory.target;
 	}
-	else {
-		print ((str (creep.name) + creep.pos.isNearTo (target)) + str (target));
-		if (creep.pos.isNearTo (target)) {
-			var result = creep.transfer (target, RESOURCE_ENERGY, _.sum (creep.carry));
-			print (result);
-			if (result == -(8)) {
-				var result = creep.transfer (target, RESOURCE_ENERGY, target.carryCapacity - _.sum (target.carry));
-				creep.memory.filling = true;
-				Mine (creep);
-				if (result != 0) {
-					print ((((str (creep.name) + ' attempted to transfer energy to ') + str (target)) + str (result)) + str (target.carryCapacity - _.sum (target.carry)));
-				}
-				else {
-					delete target.memory.target;
-					delete creep.memory.target;
-					target.memory.WaitForMiner = false;
-					creep.memory.filling = true;
-					Mine (creep);
-				}
-			}
-			else if (result != 0) {
-				print ((((str (creep.name) + ' attempted to transfer energy to ') + str (target)) + str (result)) + str (_.sum (creep.carry)));
+	else if (creep.pos.isNearTo (target)) {
+		var result = creep.transfer (target, RESOURCE_ENERGY, _.sum (creep.carry));
+		if (result == -(8)) {
+			var result = creep.transfer (target, RESOURCE_ENERGY, target.carryCapacity - _.sum (target.carry));
+			creep.memory.filling = true;
+			Mine (creep);
+			if (result != 0) {
+				print ((((str (creep.name) + ' attempted to transfer energy to ') + str (target)) + str (result)) + str (target.carryCapacity - _.sum (target.carry)));
 			}
 			else {
 				delete target.memory.target;
 				delete creep.memory.target;
 				target.memory.WaitForMiner = false;
+				creep.memory.filling = true;
 				Mine (creep);
 			}
 		}
+		else if (result != 0) {
+			print ((((str (creep.name) + ' attempted to transfer energy to ') + str (target)) + str (result)) + str (_.sum (creep.carry)));
+		}
+		else {
+			delete target.memory.target;
+			delete creep.memory.target;
+			target.memory.WaitForMiner = false;
+			Mine (creep);
+		}
+	}
+};
+var MinerIdentifyContainer = function (creep) {
+	var containers = creep.room.find (FIND_STRUCTURES).filter ((function __lambda__ (s) {
+		return s.structureType == STRUCTURE_CONTAINER;
+	}));
+	creep.memory.target = creep.pos.findClosestByPath (containers).id;
+	if (creep.memory.target == null) {
+		print ('No containers could be found for this creep: ' + str (creep.name));
+	}
+};
+var MinerTransferToContainer = function (creep) {
+	if (creep.memory.target == null) {
+		MinerIdentifyContainer (creep);
+	}
+	else {
+		var target = Game.getObjectById (creep.memory.target);
+		Replenish (creep, target);
+	}
+};
+var run_miner_midgame = function (creep) {
+	if (_.sum (creep.carry) != creep.carryCapacity) {
+		Mine (creep);
+	}
+	if (_.sum (creep.carry) > 0) {
+		MinerTransferToContainer (creep);
 	}
 };
 var Run_miner = function (creep) {
@@ -1959,6 +2230,38 @@ var Run_Reichsprotektor = function (creep) {
 		creep.memory.target = creep.room.controller.id;
 	}
 };
+var Run_Reichsprotektor_midgame = function (creep) {
+	if (_.sum (creep.carry) >= 1) {
+		creep.memory.filling = false;
+	}
+	else {
+		creep.memory.filling = true;
+	}
+	if (creep.memory.filling) {
+		if (creep.memory.WithdrawTarget == null) {
+			creep.memory.WithdrawTarget = creep.room.memory.controllerContainer;
+			collectFromSourceContainer (creep);
+		}
+		else {
+			collectFromSourceContainer (creep);
+		}
+	}
+	else if (len (creep.memory.target) > 0) {
+		var target = Game.getObjectById (creep.memory.target);
+		if (creep.memory.AwaitingRefill) {
+			creep.memory.AwaitingRefill = false;
+		}
+		if (creep.pos.inRangeTo (target, 3)) {
+			Upgrade (creep, target);
+		}
+		else {
+			CreepMove (creep, target);
+		}
+	}
+	else {
+		creep.memory.target = creep.room.controller.id;
+	}
+};
 
 var __module_harvester__ = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -1978,22 +2281,35 @@ var __module_harvester__ = /*#__PURE__*/Object.freeze({
     FindRepairTarget: FindRepairTarget,
     setTarget_Builder: setTarget_Builder,
     Run_Builder: Run_Builder,
+    Run_Builder_midgame: Run_Builder_midgame,
     CollectFromMiner: CollectFromMiner,
     TransferEnergyToWaitingTarget: TransferEnergyToWaitingTarget,
     DistributeEnergy: DistributeEnergy,
     GiveEnergyToReichsprotector: GiveEnergyToReichsprotector,
     SetHaulerJob: SetHaulerJob,
     Run_Hauler: Run_Hauler,
+    WithdrawFromContainer: WithdrawFromContainer,
+    collectFromSourceContainer: collectFromSourceContainer,
+    PickDropoffContainer: PickDropoffContainer,
+    DepositIntoContainer: DepositIntoContainer,
+    SetHaulerJobMidgame: SetHaulerJobMidgame,
+    Run_Hauler_midgame: Run_Hauler_midgame,
     transferEnergyToHauler: transferEnergyToHauler,
+    MinerIdentifyContainer: MinerIdentifyContainer,
+    MinerTransferToContainer: MinerTransferToContainer,
+    run_miner_midgame: run_miner_midgame,
     Run_miner: Run_miner,
-    Run_Reichsprotektor: Run_Reichsprotektor
+    Run_Reichsprotektor: Run_Reichsprotektor,
+    Run_Reichsprotektor_midgame: Run_Reichsprotektor_midgame
 });
 
-// Transcrypt'ed from Python, 2023-08-11 18:16:25
+// Transcrypt'ed from Python, 2023-08-22 10:57:42
 var Expansion = {};
 var SpawnManager = {};
 var Strategy = {};
+var combat = {};
 var harvester = {};
+__nest__ (combat, '', __module_combat__);
 __nest__ (SpawnManager, '', __module_SpawnManager__);
 __nest__ (Expansion, '', __module_Expansion__);
 __nest__ (Strategy, '', __module_Strategy__);
@@ -2012,10 +2328,12 @@ var main = function () {
 	var totalGefreiters = len (Schutzstaffel ['Gefreiter']);
 	for (var location of Object.keys (Game.rooms)) {
 		Strategy.IsRoomBuilding (Game.rooms [location]);
+		combat.IdentifyThreats (Game.rooms [location]);
 		Strategy.DetermineGamePhase (Game.rooms [location]);
 		Strategy.ConstructRoom (Game.rooms [location]);
 		Strategy.RoomEnergyIdentifier (Game.rooms [location]);
 		Expansion.ExpansionManager (Game.rooms [location], Schutzstaffel ['Gefreiter']);
+		Strategy.AllocateContainers (Game.rooms [location]);
 	}
 	try {
 		if (totalJacks > 0) {
@@ -2025,12 +2343,22 @@ var main = function () {
 		}
 		if (totalBuilders > 0) {
 			for (var creep of Schutzstaffel ['Builder']) {
-				harvester.Run_Builder (creep);
+				if (creep.room.memory.GamePhase > 2) {
+					harvester.Run_Builder_midgame (creep);
+				}
+				else {
+					harvester.Run_Builder (creep);
+				}
 			}
 		}
 		if (totalMiners > 0 && totalTransporters > 0) {
 			for (var creep of Schutzstaffel ['Miner']) {
-				harvester.Run_miner (creep);
+				if (creep.room.memory.GamePhase > 2) {
+					harvester.run_miner_midgame (creep);
+				}
+				else {
+					harvester.Run_miner (creep);
+				}
 			}
 		}
 		else if (totalMiners > 0) {
@@ -2040,7 +2368,12 @@ var main = function () {
 		}
 		if (totalTransporters > 0) {
 			for (var creep of Schutzstaffel ['Transporter']) {
-				harvester.Run_Hauler (creep);
+				if (creep.room.memory.GamePhase > 2) {
+					harvester.Run_Hauler_midgame (creep);
+				}
+				else {
+					harvester.Run_Hauler (creep);
+				}
 			}
 		}
 		if (totalGefreiters > 0) {
@@ -2050,8 +2383,8 @@ var main = function () {
 		}
 		if (totalReichsprotektors > 0) {
 			for (var creep of Schutzstaffel ['Reichsprotektor']) {
-				if (creep.room.memory.building == true) {
-					harvester.Run_Builder (creep);
+				if (creep.room.memory.GamePhase > 2) {
+					harvester.Run_Reichsprotektor_midgame (creep);
 				}
 				else {
 					harvester.Run_Reichsprotektor (creep);

@@ -2,6 +2,7 @@ import harvester
 import Strategy
 import Expansion
 import SpawnManager
+import combat
 # defs is a package which claims to export all constants and some JavaScript objects, but in reality does
 #  nothing. This is useful mainly when using an editor like PyCharm, so that it 'knows' that things like Object, Creep,
 #  Game, etc. do exist.
@@ -51,9 +52,9 @@ def main():
 
     # Manage each room - to be executed every 100 or so game ticks in the future.
     for location in Object.keys(Game.rooms):
-        # determine if building (to be done each tick)
-
+        # To be done each tick:
         Strategy.IsRoomBuilding(Game.rooms[location])
+        combat.IdentifyThreats(Game.rooms[location])
 
         #  to be executed every 100 or so game ticks in the future.
         Strategy.DetermineGamePhase (Game.rooms[location])
