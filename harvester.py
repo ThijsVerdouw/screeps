@@ -40,7 +40,12 @@ def Mine(creep):
         creep.moveTo(source)
 
 def FindRefillTarget(creep):
+    towers = creep.room.find(FIND_STRUCTURES).filter(lambda s: (s.structureType == STRUCTURE_TOWER) and s.energy < s.energyCapacity)
     structs = creep.room.find(FIND_STRUCTURES).filter(lambda s: (s.structureType == STRUCTURE_SPAWN or s.structureType == STRUCTURE_EXTENSION) and s.energy < s.energyCapacity)
+    if len(towers)>0:
+        structs = towers
+    else:
+        pass
     if len(structs) >0 :
         # if there is a path to the target
         try:
@@ -62,7 +67,7 @@ def FindRefillTarget(creep):
 def FindBuildTarget(creep):
     # print ('Attempting to find construction sites ', creep.name)
     structs = creep.room.find(FIND_CONSTRUCTION_SITES)
-    print (structs)
+    # print (structs)
     if structs != None and creep.pos.findClosestByPath(structs) != None:
         # if there is a path to the target
         a = creep.pos.findClosestByPath(structs).id
@@ -245,7 +250,7 @@ def setTarget_Builder (creep):
         # print('Creep ' + str(creep.memory.target) + ' is building')
         pass
     elif FindRepairTarget(creep):
-        print('Creep ' + str(creep.memory.target) + ' is repairing')
+        # print('Creep ' + str(creep.memory.target) + ' is repairing')
         pass
     else:
         FindUpgradeTarget(creep)
