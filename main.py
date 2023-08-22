@@ -64,6 +64,7 @@ def main():
 
         # Executed every 1000 ticks:
         Expansion.ExpansionManager (Game.rooms[location] ,Schutzstaffel['Gefreiter'])
+        Strategy.AllocateContainers(Game.rooms[location])
 
     # Run each creep
     try:
@@ -72,22 +73,35 @@ def main():
                 harvester.JackOfAllTrades(creep)
         if totalBuilders > 0:
             for creep in Schutzstaffel['Builder']:
-                harvester.Run_Builder(creep)
+                if creep.room.memory.GamePhase >2:
+                    harvester.Run_Builder_midgame(creep)
+                else:
+                    harvester.Run_Builder(creep)
         if totalMiners > 0 and totalTransporters > 0:
             for creep in Schutzstaffel['Miner']:
-                harvester.Run_miner(creep)
+                # print ('Room gamephase: ' + str(creep.room.memory.GamePhase))
+                if creep.room.memory.GamePhase >2:
+                    harvester.run_miner_midgame(creep)
+                else:
+                    harvester.Run_miner(creep)
         elif totalMiners > 0:
             for creep in Schutzstaffel['Miner']:
                 harvester.JackOfAllTrades(creep)
         if totalTransporters > 0:
             for creep in Schutzstaffel['Transporter']:
-                harvester.Run_Hauler(creep)
+                if creep.room.memory.GamePhase >2:
+                    harvester.Run_Hauler_midgame(creep)
+                else:
+                    harvester.Run_Hauler(creep)
         if totalGefreiters > 0:
             for creep in Schutzstaffel['Gefreiter']:
                 Expansion.scout(creep)
         if totalReichsprotektors > 0:
             for creep in Schutzstaffel['Reichsprotektor']:
-                harvester.Run_Reichsprotektor(creep)
+                if creep.room.memory.GamePhase >2:
+                    harvester.Run_Reichsprotektor_midgame(creep)
+                else:
+                    harvester.Run_Reichsprotektor(creep)
     except Exception as e:
         print('Error while running harvesters: ' + str(e))
 

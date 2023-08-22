@@ -46,14 +46,20 @@ def SpawnBuilder(spawn):
 
 def SpawnTransporter(spawn):
     creep_name = 'Transporter_' + str(Game.time)
-    modules = create_transporter(spawn.room.energyCapacityAvailable)
+    if spawn.room.memory.GamePhase <3:
+        modules = create_transporter(spawn.room.energyCapacityAvailable)
+    else:
+        modules = create_midgame_transporter(spawn.room.energyCapacityAvailable)
     Memory = {'designation':'Transporter'}
     SpawnCreep(spawn, creep_name, modules, Memory)
 
 def SpawnMiner(spawn):
     creep_name = 'Simon_' + str(Game.time)
-    print (spawn.room.energyAvailable);
-    modules = create_miner(spawn.room.energyCapacityAvailable)
+    # print (spawn.room.energyAvailable);
+    if spawn.room.memory.GamePhase <3:
+        modules = create_miner(spawn.room.energyCapacityAvailable)
+    else:
+        modules = create_midgame_miner(spawn.room.energyCapacityAvailable)
     Memory = {'designation':'Miner'}
     SpawnCreep(spawn, creep_name, modules, Memory)
 
@@ -63,6 +69,22 @@ def SpawnReichsprotektor (spawn):
     Memory = {'designation':'Reichsprotektor'}
     SpawnCreep(spawn, creep_name, modules, Memory)
 
+
+def create_midgame_transporter (room_capacity):
+    """
+    Effectively the same creep as the early game version, but this one assumes we have roads.
+    """
+    modules = []
+    full_sets = int(room_capacity/150)
+    for i in range(full_sets): #int rounds down
+        modules.append(CARRY)
+        modules.append(CARRY)
+        modules.append(MOVE)
+    if (room_capacity - (full_sets * 150)) == 100:
+        modules.append(MOVE)
+        modules.append(CARRY)
+    modules.sort()
+    
 def create_transporter(room_capacity):
     modules = []
     if room_capacity == 300:
@@ -76,15 +98,18 @@ def create_transporter(room_capacity):
             modules.append(CARRY)
             modules.append(MOVE)
 
-        # V2: (assumes roads)
-            # full_sets = int(room_capacity/150)
-            # for i in range(full_sets): #int rounds down
-            #     modules.append(CARRY)
-            #     modules.append(CARRY)
-            #     modules.append(MOVE)
-            # if (room_capacity - (full_sets * 150)) == 100:
-            #     modules.append(MOVE)
-            #     modules.append(CARRY)
+    modules.sort()
+    return modules
+
+def create_midgame_miner(room_capacity):
+    modules = []
+    room_capacity = room_capacity - 100
+    # The Thijs-miner is 6 work, 1 carry 1 move
+    full_sets = min(int(room_capacity/100),6)
+    for i in range(full_sets): #int rounds down
+        modules.append(WORK)
+    modules.append(CARRY)
+    modules.append(MOVE)
     modules.sort()
     return modules
 

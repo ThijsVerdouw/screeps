@@ -21,6 +21,8 @@ def CollectEnergyIfneeded (creep):
         del creep.memory.target
         del creep.memory.job
 
+
+
 def Mine(creep):
     # If we have a saved source, use it
     if creep.memory.source:
@@ -61,21 +63,17 @@ def FindBuildTarget(creep):
     # print ('Attempting to find construction sites ', creep.name)
     structs = creep.room.find(FIND_CONSTRUCTION_SITES)
     print (structs)
-    if len(structs) >0 :
+    if structs != None and creep.pos.findClosestByPath(structs) != None:
         # if there is a path to the target
-        try:
-            a = creep.pos.findClosestByPath(structs).id
-            creep.memory.target = a
-            target = Game.getObjectById(a)
-            creep.memory.job = 'Build'
-            # Target identified, now act on it:
-            # Build(creep, target)
-            return True
-        except Exception as e:
-            print ('No path to target for creep: ', creep.name)
-            return False
-            pass
+        a = creep.pos.findClosestByPath(structs).id
+        creep.memory.target = a
+        target = Game.getObjectById(a)
+        creep.memory.job = 'Build'
+        # Target identified, now act on it:
+        # Build(creep, target)
+        return True
     else:
+        print ('No path to target for creep: ', creep.name)
         return False
 
 def FindUpgradeTarget(creep):
@@ -110,7 +108,10 @@ def CreepMove (creep, target):
         del creep.memory.target
 
 def Replenish(creep, target):
-    result = creep.transfer(target, RESOURCE_ENERGY)
+    amountToBeDeposited = _.sum(creep.carry)
+    roomAvailable = target.store.getFreeCapacity
+    amountToBeDeposited = min(amountToBeDeposited, roomAvailable)
+    result = creep.transfer(target, RESOURCE_ENERGY, amountToBeDeposited)
     if result == -7 or result == -10:
         print("[{}] Unknown result from creep.transfer({}, {}): {}".format(
             creep.name, target, RESOURCE_ENERGY, result))
@@ -261,6 +262,7 @@ def Run_Builder(creep):
     4. Perform the action related to your target (build building, upgrade controller, refill energy, etc)
     4b. If the target is invalid for some reason, delete the target and start from 2.
     '''
+
     CollectEnergyIfneeded(creep)
     if creep.memory.filling:
         # print('Creep ' + str(creep) + ' is filling')
@@ -293,6 +295,55 @@ def Run_Builder(creep):
         setTarget_Builder(creep)
 
 ############################################################# End of Jack of all trades ####################################################################
+
+def Run_Builder_midgame(creep):
+    '''
+    This is the basic creep running framework, it works in this order:
+    1. check if you have energy.
+    1b. If you do not have energy, get it. (by mining or by withdrawing from storage/other creeps. Chosen method depends on the type of creep.)
+    2. Check if you have a target.
+    2b. If you do not have a target, get one from the list of possible targets.
+    3. Check if you are in range of your target.
+    3b. If you are not in range of your target, move to your target.
+    4. Perform the action related to your target (build building, upgrade controller, refill energy, etc)
+    4b. If the target is invalid for some reason, delete the target and start from 2.
+    '''
+
+    CollectEnergyIfneeded(creep)
+    if creep.memory.filling:
+        # print('Creep ' + str(creep) + ' is filling')
+        if creep.memory.WithdrawTarget == None:
+            creep.memory.WithdrawTarget = creep.room.memory.controllerContainer
+            collectFromSourceContainer(creep)
+        else:
+            collectFromSourceContainer(creep)
+    elif len(creep.memory.target)>0:
+        target = Game.getObjectById(creep.memory.target)
+
+        # If construction was already finished, it refers to a NONEXISTING construction site.
+        if target is None:
+            del creep.memory.target
+
+        # Ductape fix:
+        if creep.memory.AwaitingRefill:
+            creep.memory.AwaitingRefill = False
+        # print('Creep ' + str(creep) + ' is close to the target: ' + str(creep.pos.inRangeTo(target, 3)))
+        if creep.pos.inRangeTo(target, 3):
+            if creep.memory.job == 'Build':
+                # print('Creep ' + str(creep) + ' attempts to build')
+                Build(creep, target)
+            elif creep.memory.job == 'Repair':
+                # print('Creep ' + str(creep) + ' attempts to Repair')
+                Repair(creep, target)
+            else:
+                # print('Creep ' + str(creep) + ' attempts to upgrade')
+                Upgrade(creep, target)
+        else:
+            CreepMove(creep, target)
+
+    else:
+        setTarget_Builder(creep)
+
 ################################################################## Start of Hauler #########################################################################
 
 def CollectFromMiner (creep):
@@ -432,6 +483,9 @@ def DistributeEnergy (creep):
         del creep.memory.job
 
 def GiveEnergyToReichsprotector (creep):
+    """
+    Me, 15-08-2023: This has been pass but the code works!? no fucking clue. Leave it be just in case.
+    """
     pass
 
 def SetHaulerJob (creep):
@@ -479,9 +533,169 @@ def Run_Hauler(creep):
 
 
 ################################################################## End of Hauler ###########################################################################
+############################################################### start of hauler V2 #########################################################################
+def WithdrawFromContainer(creep, target):
+    amountToBeWithdrawn = creep.carryCapacity - _.sum(creep.carry)
+    energyAvailable = target.store.getUsedCapacity(RESOURCE_ENERGY)
+    # Do not try to overdraw, either get the amount you can carry or get the amount of energy in the sthing. Whichever is the least.
+    amountToBeWithdrawn = min(amountToBeWithdrawn, energyAvailable)
+    if amountToBeWithdrawn == 0:
+        del creep.memory.WithdrawTarget
+    else:
+        result = creep.withdraw(target, RESOURCE_ENERGY, amountToBeWithdrawn)
+        if  result == 0:
+            del creep.memory.WithdrawTarget
+        elif result <-5:
+            print (creep.name + ' Failed to withdrawn energy from ' + str(target.id) + str(result) + ' , contained this much energy: ' + str(energyAvailable))
+            del creep.memory.WithdrawTarget
+
+
+def collectFromSourceContainer(creep):
+    """
+    First it has to idenitfy which container will be the target
+    once the target is set, move to the target.
+    once you get there, withdraw and delete target.
+    done
+    """
+    if creep.memory.WithdrawTarget == None:
+        for i in creep.room.memory.sourceContainers:
+            container = Game.getObjectById(i)
+            if container.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.carryCapacity:
+                creep.memory.WithdrawTarget = container.id
+                break
+
+    target = Game.getObjectById(creep.memory.WithdrawTarget)
+    if target == None:
+        del creep.memory.WithdrawTarget
+    else:
+        if not creep.pos.isNearTo(target):
+            # if not next to the container
+            CreepMove(creep, target)
+            if creep.pos.isNearTo(target):
+                WithdrawFromContainer(creep, target)
+        else:
+            WithdrawFromContainer(creep, target)
+
+def PickDropoffContainer (creep):
+    """
+    The first thing it has to to is figure out which container to put the energy into:
+    """
+
+    # If no end destination is defined:
+    if creep.memory.target == None:
+        # Check if spawn has an empty container:
+        container = Game.getObjectById(creep.room.memory.spawnContainer)
+        if container.store.getFreeCapacity(RESOURCE_ENERGY) <=0:
+            # Check if controller has an empty container:
+            container = Game.getObjectById(creep.room.memory.controllerContainer)
+            if container.store.getFreeCapacity(RESOURCE_ENERGY) <=0:
+                # Do nothing, wait for a container to become empty.
+                pass
+            else:
+                # Set target == to container at controller
+                creep.memory.target = container.id
+                if not creep.pos.isNearTo(container):
+                    # if not next to the container
+                    CreepMove(creep, container)
+                else:
+                    Replenish(creep, target)
+
+        else:
+            # Set target == to container at spawn
+            creep.memory.target = container.id
+            if not creep.pos.isNearTo(container):
+                # if not next to the container
+                CreepMove(creep, container)
+            else:
+                Replenish(creep, target)
+
+def DepositIntoContainer (creep, target):
+    if creep.pos.isNearTo(target):
+        Replenish(creep, target)
+    else:
+        CreepMove(creep, target)
+        if creep.pos.isNearTo(target):
+            Replenish(creep, target)
+
+
+# amountToBeWithdrawn = creep.carryCapacity - _.sum(creep.carry)
+# energyAvailable = target.store.getUsedCapacity
+# # Do not try to overdraw, either get the amount you can carry or get the amount of energy in the sthing. Whichever is the least.
+# amountToBeWithdrawn = min(amountToBeWithdrawn, energyAvailable)
+# result = creep.withdraw(target, RESOURCE_ENERGY, amountToBeWithdrawn)
+# if result == 0:
+#     del creep.memory.WithdrawTarget
+# elif result <-5:
+#     print (creep.name + ' Failed to withdrawn energy from ' + str(target.id))
+#     del creep.memory.WithdrawTarget
+
+
+
+def SetHaulerJobMidgame(creep):
+        if FindRefillTarget(creep):
+            creep.memory.job = 'Replenish'
+        else:
+            creep.memory.job = 'ContainerRefill'
+
+def Run_Hauler_midgame(creep):
+    '''
+    The hauler does the following:
+    1. Check if it is empty
+    1b. if empty, collect energy from one of the containers associated to a source
+    2.
+    '''
+    CollectEnergyIfneeded(creep)
+    if creep.memory.filling:
+        # print('Creep ' + str(creep) + ' is filling')
+        collectFromSourceContainer (creep)
+    # If it has a job, act on it, else get a job.
+    elif len (creep.memory.job) >0:
+        # Refill spawn and extensions:
+        if creep.memory.job == 'Replenish':
+            if len(creep.memory.target)>0:
+                target = Game.getObjectById(creep.memory.target)
+                if creep.pos.isNearTo(target):
+                    Replenish(creep, target)
+                else:
+                    CreepMove(creep, target)
+            # Find a new refill target:
+            elif FindRefillTarget(creep):
+                # Returns true if it found an extension or spawn to refill, if it does not find one it will go to the else (and resets the job.)
+                pass
+            # Reset:
+            else:
+                del creep.memory.job
+
+        elif creep.memory.job == 'ContainerRefill':
+            # Refill containers:
+            if len(creep.memory.target)>0:
+                target = Game.getObjectById(creep.memory.target)
+                DepositIntoContainer(creep, target)
+            # Find a new refill target:
+            elif PickDropoffContainer(creep):
+                pass
+            # Reset:
+            else:
+                del creep.memory.job
+        # Debugging line: if it has a job, but its neither of the accepted jobs, delete the job:
+        else:
+            del creep.memory.job
+    else:
+        SetHaulerJobMidgame(creep)
+
+
+############################################################### end of hauler V2 ##########################################################################
+
+
 ################################################################# Start of Miner ###########################################################################
 
 def transferEnergyToHauler (creep, target):
+    """"
+    The aim of this code is for the miner to do the following:
+    0. The hauler has told the miner (see run_hauler) it is ready to recieve the energy from the miner.
+    1. The hauler tries to transfer the enrgy to the target (hauler)
+    2. The miner sets the memory of the hauler to the "I have recieved energy from the miner"
+    """
     if target == None:
         print (str(creep.name) + ' attempted to transfer energy to a nonexisting creep.' )
         del creep.memory.target
@@ -510,6 +724,42 @@ def transferEnergyToHauler (creep, target):
                 target.memory.WaitForMiner = False
                 Mine(creep)
 
+def MinerIdentifyContainer(creep):
+    """
+    Is there a container within 1 tile of the miner? Yes. Remember it as your target until you die.
+    """
+    containers = creep.room.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)
+    creep.memory.target = creep.pos.findClosestByPath(containers).id
+    if creep.memory.target == None:
+        # should never happen. but if it does, fuck it.
+        print('No containers could be found for this creep: ' + str(creep.name))
+
+def MinerTransferToContainer (creep):
+    """
+    Do you have a container in memory? yes. Dump your energy in it.
+    No? Get one in memory.
+    """
+    if creep.memory.target == None:
+        MinerIdentifyContainer(creep)
+    else:
+        target = Game.getObjectById(creep.memory.target)
+        Replenish(creep, target)
+
+def run_miner_midgame(creep):
+    '''
+    The Miner does the following:
+    1. Check if it is empty
+    1b. If empty, get energy by walking to a to a source and mine it.
+    2. Once full, transer to a nearby source.
+    They do this until they die. Poor sods. I feel like this life of slavery needs some form of reprieve.
+    I hope God grants them Mercy.
+    For I will not.
+    '''
+    # print('We are actually running a midgame creep')
+    if _.sum(creep.carry) != creep.carryCapacity:
+        Mine(creep)
+    if _.sum(creep.carry) > 0:
+        MinerTransferToContainer(creep)
 
 def Run_miner (creep):
     '''
@@ -561,6 +811,46 @@ def Run_Reichsprotektor(creep):
     if creep.memory.filling:
         # print('Creep ' + str(creep) + ' is filling')
         collectFromLogisticsBoi(creep)
+    elif len(creep.memory.target)>0:
+        target = Game.getObjectById(creep.memory.target)
+
+        # Ductape fix:
+        if creep.memory.AwaitingRefill:
+            creep.memory.AwaitingRefill = False
+        # print('Creep ' + str(creep) + ' is close to the target: ' + str(creep.pos.inRangeTo(target, 3)))
+        if creep.pos.inRangeTo(target, 3):
+                Upgrade(creep, target)
+        else:
+            CreepMove(creep, target)
+
+    else:
+        creep.memory.target = creep.room.controller.id
+
+################################################################### Midgame version ################################################################
+def Run_Reichsprotektor_midgame(creep):
+    '''
+    This is the basic creep running framework, it works in this order:
+    1. check if you have energy.
+    1b. If you do not have energy, get it. (by withdrawing from storage)
+    2. Check if you have a target.
+    2b. If you do not have a target, get one from the list of possible targets.
+    3. Check if you are in range of your target.
+    3b. If you are not in range of your target, move to your target.
+    4. Perform the action related to your target (build building, upgrade controller, refill energy, etc)
+    4b. If the target is invalid for some reason, delete the target and start from 2.
+    '''
+    if _.sum(creep.carry) >= 1:
+        creep.memory.filling = False
+    else:
+        creep.memory.filling = True
+
+    if creep.memory.filling:
+        # print('Creep ' + str(creep) + ' is filling')
+        if creep.memory.WithdrawTarget == None:
+            creep.memory.WithdrawTarget = creep.room.memory.controllerContainer
+            collectFromSourceContainer(creep)
+        else:
+            collectFromSourceContainer(creep)
     elif len(creep.memory.target)>0:
         target = Game.getObjectById(creep.memory.target)
 

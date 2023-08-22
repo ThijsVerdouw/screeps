@@ -22,7 +22,7 @@ def ExpansionManager (location, scouts):
 def MoveToTargetRoom (creep, targetRoom):
     print('Attempting to move creep: ' + str(creep) + ' to room: ' + str(targetRoom))
     if creep.memory.route == undefined:
-        print('a')
+        print('Creep tried to move to a different room without having a route')
         # Finds path to the target room, using https://docs.screeps.com/api/#Game.map.findRoute
         # use https://docs.screeps.com/api/#RoomPosition.findPathTo to move to that rooms controller
         route = Game.map.findRoute(creep.room, targetRoom)

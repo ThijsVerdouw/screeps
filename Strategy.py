@@ -31,12 +31,12 @@ def DetermineGamePhase (location):
     # not owned by me:
     if len(location.controller) > 0:
         if not location.controller.my:
-            location.memory.GamePhase = 'UnUsed'
+            location.memory.GamePhase = 0 # unused.
             location.memory.building = False
 
         # The true start of the game, no creeps:
         elif location.controller.level <2:
-            location.memory.GamePhase = 'T0'
+            location.memory.GamePhase = 1
             location.memory.minersPerAccessPoint = 1
             location.memory.expanding = False
             location.memory.remoteMining = False
@@ -45,41 +45,42 @@ def DetermineGamePhase (location):
             location.memory.MaxHarversPerSource = 2
 
         # If at the start of the game and not enough extensions have been made:
-        elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) < 2:
-            location.memory.GamePhase = 'GameStart'
-            location.memory.minersPerAccessPoint = 1
-            location.memory.expanding = False
-            location.memory.remoteMining = False
-            location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 1
-            location.memory.MaxHarversPerSource = 2
+        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5:
+            # print((location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5)
+            location.memory.GamePhase = 2
+            # This needs to trigger building of extensions.
 
-        elif location.controller.level <3:
-            location.memory.GamePhase = 'GameStart'
-            location.memory.minersPerAccessPoint = 1
-            location.memory.expanding = False
-            location.memory.remoteMining = False
-            location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 1
-            location.memory.MaxHarversPerSource = 2
-
-        elif _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >8 and _.sum(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 1:
-            # Add filter to ensure the number of rooms < maximum number of rooms.
-            location.memory.GamePhase = 'ReadyToRumble'
-            location.memory.minersPerAccessPoint = 2
-            location.memory.expanding = True
-            location.memory.remoteMining = False
-            location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 1
+            # location.memory.minersPerAccessPoint = 1
+            # location.memory.expanding = False
+            # location.memory.remoteMining = False
+            # location.memory.scoutNeeded = False
+            # location.memory.TransportersPerAccesPoint = 1
+            # location.memory.MaxHarversPerSource = 2
+        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) >2:
+            location.memory.GamePhase = 3
             location.memory.MaxHarversPerSource = 1
+            # This needs to trigger construction of extensions and containers.
+        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >=8 and len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 2:
+            # Add filter to ensure the number of rooms < maximum number of rooms.
+            location.memory.GamePhase = 4
+            location.memory.MaxHarversPerSource = 1
+            # location.memory.transportersNeeded =
+            # location.memory.minersPerAccessPoint = 1
+            location.memory.expanding = True
+            location.memory.remoteMining = True
+            # location.memory.scoutNeeded = False
+            # location.memory.TransportersPerAccesPoint = 1
+
         else:
-            location.memory.GamePhase = 'Debug'
-            location.memory.minersPerAccessPoint = 0
+            location.memory.GamePhase = 420 #debug
+            # location.memory.minersPerAccessPoint = 1
     else:
-        location.memory.GamePhase = 'UnUsed'
+        location.memory.GamePhase = -1
         location.memory.building = False
-    location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints
-    location.memory.MaxHarversPerSource = 2
+
+    if location.memory.GamePhase >0:
+        location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints
+
     # print(location.memory.GamePhase)
 
 def IsRoomBuilding(location):
@@ -155,7 +156,7 @@ def RoomEnergyIdentifier (location):
                     accessPoints = min(accessPoints + 1, location.memory.MaxHarversPerSource)
                     # print('We now have this many access points: ' + str(accessPoints))
         totalAccesPoints = totalAccesPoints + accessPoints
-        listForSourceData.append([source, accessPoints])
+        listForSourceData.append([source.id, accessPoints])
     # print (listForSourceData)
     location.memory.totalAccesPoints = totalAccesPoints
     location.memory.sourceAccessability = listForSourceData
@@ -184,13 +185,13 @@ def IdentifyMinionsNeeded (location):
         location.memory.upgradersNeeded = 1
     else:
         # The number of promoters is the sum of miners * 2.5. Again, assuming identical work modules (which is likely) and all energy is used for promotion.
-        location.memory.upgradersNeeded = round(location.memory.requiredHarvesters * 2 )
+        location.memory.upgradersNeeded = int(location.memory.requiredHarvesters * 2 )
 
     # The number of haulers would be calculated with a relatively complicated calculation:
     # trip time = (Distance between source and dropoff point in ticks * 2) + 8). The +8 is time for refill.
     # ticks until miner is full = carrycapacity / (work parts * 2)
     # needed haulers = ticks until miner is full / trip time. Rounded upwards
-    location.memory.transportersNeeded = location.memory.requiredHarvesters * location.memory.TransportersPerAccesPoint # (this obviously is a placeholder)
+    location.memory.transportersNeeded = int(location.memory.requiredHarvesters * 1.5) # (this obviously is a placeholder)
 
 
 
@@ -204,7 +205,7 @@ def assignSameRoomSource (location):
 
     # print(location.memory.sourceAccessability[0],location.memory.sourceAccessability[1],location.memory.sourceAccessability[0][0],location.memory.sourceAccessability[0][1])
     for i in range(len(location.memory.sourceAccessability)):
-        source = location.memory.sourceAccessability[i][0]
+        source = Game.getObjectById(location.memory.sourceAccessability[i][0])
         requiredCreeps = min(2,location.memory.sourceAccessability[i][1]) * location.memory.minersPerAccessPoint
 
         num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.source == source.id and len(c.memory.source)>0))
@@ -224,7 +225,7 @@ def assignSameRoomPickupPoint (location):
     """
     print('attemping to assign source for location')
     for i in range(len(location.memory.sourceAccessability)):
-        source = location.memory.sourceAccessability[i][0]
+        source = Game.getObjectById(location.memory.sourceAccessability[i][0])
         requiredCreeps =  min(location.memory.MaxHarversPerSource, location.memory.sourceAccessability[i][1]) * location.memory.TransportersPerAccesPoint
 
         num_creeps = len(location.find(FIND_CREEPS).filter(lambda c: c.memory.PickupPoint == source.id and len(c.memory.PickupPoint)>0))
@@ -237,50 +238,50 @@ def assignSameRoomPickupPoint (location):
             return source.id
         # For remote mining creeps: add elif here to do the same, but with num_creeps = game.creeps.find instead of room.creeps.find
 
-# example from https://docs.screeps.com/api/#PathFinder for further improvement:
-  # let creep = Game.creeps.John;
-  #
-  # let goals = _.map(creep.room.find(FIND_SOURCES), function(source) {
-  #   // We can't actually walk on sources-- set `range` to 1
-  #   // so we path next to it.
-  #   return { pos: source.pos, range: 1 };
-  # });
-  #
-  # let ret = PathFinder.search(
-  #   creep.pos, goals,
-  #   {
-  #     // We need to set the defaults costs higher so that we
-  #     // can set the road cost lower in `roomCallback`
-  #     plainCost: 2,
-  #     swampCost: 10,
-  #
-  #     roomCallback: function(roomName) {
-  #
-  #       let room = Game.rooms[roomName];
-  #       // In this example `room` will always exist, but since
-  #       // PathFinder supports searches which span multiple rooms
-  #       // you should be careful!
-  #       if (!room) return;
-  #       let costs = new PathFinder.CostMatrix;
-  #
-  #       room.find(FIND_STRUCTURES).forEach(function(struct) {
-  #         if (struct.structureType === STRUCTURE_ROAD) {
-  #           // Favor roads over plain tiles
-  #           costs.set(struct.pos.x, struct.pos.y, 1);
-  #         } else if (struct.structureType !== STRUCTURE_CONTAINER &&
-  #                    (struct.structureType !== STRUCTURE_RAMPART ||
-  #                     !struct.my)) {
-  #           // Can't walk through non-walkable buildings
-  #           costs.set(struct.pos.x, struct.pos.y, 0xff);
-  #         }
-  #       });
-  #
-  #       // Avoid creeps in the room
-  #       room.find(FIND_CREEPS).forEach(function(creep) {
-  #         costs.set(creep.pos.x, creep.pos.y, 0xff);
-  #       });
-  #
-  #       return costs;
-  #     },
-  #   }
-  # );
+def GetClosestContainer (containers, target, acceptableDistance):
+    for container in containers:
+        # print('Attempting assing container 'str(container) + ' to target: ' + str(target))
+        if container.pos.inRangeTo(target, acceptableDistance):
+            result = container.id
+
+    if result == None:
+        print('Error in allocating source for: ' + str(target.name))
+    return result
+
+
+def AllocateContainers(location):
+    """
+    The aim of this code is to allocate one source per potential energy creation/consumption location:
+    1 for spawn,
+    1 for the controller,
+    1 for each source.
+    This is to be stored in the memory of the room in order for the haulers to set their targets.
+    """
+    containers = location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)
+    # If there are enough containers:
+    if len(containers) >= (2 + len(location.memory.sourceNr)):
+        # start allocation:
+        sourceContainers = []
+        for i in range(len(location.memory.sourceAccessability)):
+            # Allocate one container to each source:
+            source = Game.getObjectById(location.memory.sourceAccessability[i][0])
+            sourceContainers.append(GetClosestContainer (containers, source, 2))
+
+        location.memory.sourceContainers = sourceContainers
+        location.memory.controllerContainer = GetClosestContainer (containers, location.controller, 3)
+        # This picks a random spawn from the list of spawners in the room. Potential issue when you have >1 spawns. But that'll probably never happen lol.
+        spawn = location.find(FIND_MY_SPAWNS)
+        if len(spawn) >0:
+            spawn = spawn[0]
+        else:
+            print('Error in finding spawn')
+        location.memory.spawnContainer = GetClosestContainer (containers, spawn, 1)
+
+
+
+
+
+
+
+            # Game.getObjectById(creep.room.controller.id)
+            # len(location.find(FIND_STRUCTURES).filter(lambda s: s.hits < (s.hitsMax * 0.8)))
