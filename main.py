@@ -25,6 +25,22 @@ def main():
     """
     Main game logic loop.
     """
+    
+    # for(var i in Memory.creeps) {
+    #     if(!Game.creeps[i]) {
+    #         delete Memory.creeps[i];
+    #     }
+    # }    
+    
+    # i = 0
+    # b = 0
+    # for i in Memory.creeps:
+    #     if i == None:
+    #         b = b + 1
+    #         print (creep)
+    #     else:
+    #         print(creep.name)
+    # print(i, b)
 
     # Identify all living creeps: (should be improved by storing their ID's in memory and by removing or adding when spawning or dying.)
     # Current cost is about 2-3 cpu per cycle, so pretty big and pretty inefficient.

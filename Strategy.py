@@ -28,8 +28,14 @@ def DetermineGamePhase (location):
     """
     # print('Before logic: ' + str(location.memory.GamePhase) + ' For var: ' + str(location))
 
+    controllers = len(location.controller)
+    extensions = len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION))
+    containers = len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER))
+    # print (containers, extensions)
+    
+    
     # not owned by me:
-    if len(location.controller) > 0:
+    if controllers > 0:
         if not location.controller.my:
             location.memory.GamePhase = 0 # unused.
             location.memory.building = False
@@ -41,38 +47,64 @@ def DetermineGamePhase (location):
             location.memory.expanding = False
             location.memory.remoteMining = False
             location.memory.scoutNeeded = False
-            location.memory.TransportersPerAccesPoint = 1
+            location.memory.TransportersPerAccesPoint = 2
+            location.memory.transportersNeeded = location.memory.TransportersPerAccesPoint  * location.memory.totalAccesPoints
             location.memory.MaxHarversPerSource = 2
 
         # If at the start of the game and not enough extensions have been made:
-        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5:
+        elif extensions <5 or containers <= 2:
             # print((location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) <5)
             location.memory.GamePhase = 2
             # This needs to trigger building of extensions.
-
-            # location.memory.minersPerAccessPoint = 1
-            # location.memory.expanding = False
-            # location.memory.remoteMining = False
-            # location.memory.scoutNeeded = False
-            # location.memory.TransportersPerAccesPoint = 1
-            # location.memory.MaxHarversPerSource = 2
-        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) >2:
+            
+            # The reason these are set to the same values as the previous gamephase is to ensure nothing dies when the bot reverts to this gamephase from a higher one.
+            location.memory.minersPerAccessPoint = 1
+            location.memory.expanding = False
+            location.memory.remoteMining = False
+            location.memory.scoutNeeded = False
+            location.memory.TransportersPerAccesPoint = 2
+            location.memory.transportersNeeded = location.memory.TransportersPerAccesPoint  * location.memory.totalAccesPoints
+            location.memory.MaxHarversPerSource = 2
+            
+        elif containers >= len(location.memory.listForSourceData) + 2 and extensions <= 8:
             location.memory.GamePhase = 3
             location.memory.MaxHarversPerSource = 1
-            # This needs to trigger construction of extensions and containers.
-        elif len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_EXTENSION)) >=8 and len(location.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)) > 2:
+            
+        elif extensions > 8 and extensions <=41  and containers >= len(location.memory.listForSourceData) + 2:
             # Add filter to ensure the number of rooms < maximum number of rooms.
             location.memory.GamePhase = 4
             location.memory.MaxHarversPerSource = 1
             # location.memory.transportersNeeded =
             # location.memory.minersPerAccessPoint = 1
-            location.memory.expanding = True
+            location.memory.expanding = False
+            location.memory.scoutNeeded = False
             location.memory.remoteMining = True
+            if extensions >16:
+                location.memory.TransportersPerAccesPoint = 1
+                
+            else:
+                location.memory.TransportersPerAccesPoint = 1.5
+            location.memory.transportersNeeded = int(location.memory.TransportersPerAccesPoint  * location.memory.totalAccesPoints)
+                
             # location.memory.scoutNeeded = False
-            # location.memory.TransportersPerAccesPoint = 1
-
+            
+            # The number of haulers should be calculated with a relatively complicated calculation:
+            # trip time = (Distance between source and dropoff point in ticks * 2) + 8). The +8 is time for refill.
+            # ticks until miner is full = carrycapacity / (work parts * 2)
+            # needed haulers = ticks until miner is full / trip time. Rounded upwards
+            # location.memory.transportersNeeded = int(location.memory.requiredHarvesters * 1.5) # (this obviously is a placeholder)
+        
+        elif extensions >42:
+            location.memory.GamePhase = 5
+            
+        # Prevent weird stuff
+        elif containers >= len(location.memory.listForSourceData) + 2:
+            location.memory.GamePhase = 3
+            location.memory.MaxHarversPerSource = 1
+            # This needs to trigger construction of extensions and containers.
+            
         else:
-            location.memory.GamePhase = 420 #debug
+            location.memory.GamePhase = -420 #debug
             # location.memory.minersPerAccessPoint = 1
     else:
         location.memory.GamePhase = -1
@@ -82,7 +114,7 @@ def DetermineGamePhase (location):
         location.memory.requiredHarvesters = location.memory.minersPerAccessPoint * location.memory.totalAccesPoints
 
     # print(location.memory.GamePhase)
-
+  
 def IsRoomBuilding(location):
     if len(location.controller) > 0:
         if location.controller.my:
@@ -187,11 +219,7 @@ def IdentifyMinionsNeeded (location):
         # The number of promoters is the sum of miners * 2.5. Again, assuming identical work modules (which is likely) and all energy is used for promotion.
         location.memory.upgradersNeeded = int(location.memory.requiredHarvesters * 2 )
 
-    # The number of haulers would be calculated with a relatively complicated calculation:
-    # trip time = (Distance between source and dropoff point in ticks * 2) + 8). The +8 is time for refill.
-    # ticks until miner is full = carrycapacity / (work parts * 2)
-    # needed haulers = ticks until miner is full / trip time. Rounded upwards
-    location.memory.transportersNeeded = int(location.memory.requiredHarvesters * 1.5) # (this obviously is a placeholder)
+    
 
 
 
