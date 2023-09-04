@@ -40,7 +40,10 @@ def SpawnScout (spawn):
 
 def SpawnBuilder(spawn):
     creep_name = 'Bob_' + str(Game.time)
-    modules = create_balanced(spawn.room.energyCapacityAvailable)
+    if spawn.room.memory.GamePhase <3:    
+        modules = create_balanced(prevent_stupid_amount_of_extions_breaking_everything(spawn.room.energyCapacityAvailable))
+    else:
+        modules = create_balanced(limit_midgame_creeps(spawn.room.energyCapacityAvailable))
     Memory = {'designation':'Builder'}
     SpawnCreep(spawn, creep_name, modules, Memory)
 
@@ -70,11 +73,30 @@ def SpawnReichsprotektor (spawn):
     SpawnCreep(spawn, creep_name, modules, Memory)
 
 
+def prevent_stupid_amount_of_extions_breaking_everything(room_capacity):
+    """
+    function name tells you everything you need to know
+    """
+    if room_capacity >= 700:
+        return 700
+    else:
+        return room_capacity
+    
+def limit_midgame_creeps (room_capacity):
+    """
+    Do not want to use room level here, just doing a functional fix.
+    """
+    if room_capacity >= 1100:
+        return 1100
+    else:
+        return room_capacity
+
 def create_midgame_transporter (room_capacity):
     """
     Effectively the same creep as the early game version, but this one assumes we have roads.
     """
     modules = []
+    room_capacity = limit_midgame_creeps (room_capacity)
     full_sets = int(room_capacity/150)
     for i in range(full_sets): #int rounds down
         modules.append(CARRY)
@@ -88,6 +110,9 @@ def create_midgame_transporter (room_capacity):
     return modules
 
 def create_transporter(room_capacity):
+    # if, for some reason, I have built a fuckload of extensions: prevent the builders from being insane.
+    room_capacity = prevent_stupid_amount_of_extions_breaking_everything(room_capacity)
+    
     modules = []
     if room_capacity == 300:
         modules = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE]
@@ -103,7 +128,7 @@ def create_transporter(room_capacity):
     modules.sort()
     return modules
 
-def create_midgame_miner(room_capacity):
+def create_midgame_miner(room_capacity):    
     modules = []
     room_capacity = room_capacity - 100
     # The Thijs-miner is 6 work, 1 carry 1 move
@@ -117,7 +142,8 @@ def create_midgame_miner(room_capacity):
 
 def create_miner (room_capacity):
     modules = []
-
+    room_capacity = prevent_stupid_amount_of_extions_breaking_everything(room_capacity)
+    
     # Starter chump:
     if room_capacity == 300:
         modules = [WORK, WORK, CARRY, MOVE]
@@ -140,13 +166,12 @@ def create_miner (room_capacity):
 
 def create_balanced (room_capacity):
     modules = []
-
     # Starter chump:
     if room_capacity == 300:
         modules = [WORK, CARRY, CARRY, MOVE, MOVE]
-    else:
-        # If we have 1 or more extensions:
-        # each full set of parts costs 1 work = 100 + 1 move = 50 + 1 carry = 50, sum = 200.
+    
+    # Midgame variant, need to prevent the haulers from being excessively big:
+    else: 
         full_sets = int(room_capacity/200)
         for i in range(int(room_capacity/200)): #int rounds down
             modules.append(WORK)

@@ -34,7 +34,7 @@ def Mine(creep):
     # If we're near the source, harvest it - otherwise, move to it.
     if creep.pos.isNearTo(source):
         result = creep.harvest(source)
-        if result != OK:
+        if result != OK and result != -6:
             print("[{}] Unknown result from creep.harvest({}): {}".format(creep.name, source, result))
     else:
         creep.moveTo(source)
@@ -384,7 +384,9 @@ def CollectFromMiner (creep):
                 break
     # If we are not even near the pickup point, move to the pickup point.
     else:
-        if creep.pos.inRangeTo(PickupPoint, 2):
+        if PickupPoint == None:
+            pass
+        elif creep.pos.inRangeTo(PickupPoint, 2):
             creep.memory.WaitForMiner = True
             creep.memory.Miners = []
             # Find the miners who are currently mining from this source:
@@ -400,7 +402,9 @@ def CollectFromMiner (creep):
     if len(creep.memory.target) > 0:
         target = Game.getObjectById(creep.memory.target)
         # print ('moving to ' + str(target))
-        if creep.pos.isNearTo(target) == False:
+        if target == None:
+            del creep.memory.target
+        elif creep.pos.isNearTo(target) == False:
             CreepMove(creep, target)
         # If another creep has already emptied this creeps inventory.
         elif _.sum(target.carry) < target.carryCapacity:
@@ -565,7 +569,9 @@ def collectFromSourceContainer(creep):
     if creep.memory.WithdrawTarget == None:
         for i in creep.room.memory.sourceContainers:
             container = Game.getObjectById(i)
-            if container.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.carryCapacity:
+            if container == None:
+                pass
+            elif container.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.carryCapacity:
                 creep.memory.WithdrawTarget = container.id
                 break
 
@@ -733,11 +739,14 @@ def MinerIdentifyContainer(creep):
     """
     Is there a container within 1 tile of the miner? Yes. Remember it as your target until you die.
     """
-    containers = creep.room.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)
-    creep.memory.target = creep.pos.findClosestByPath(containers).id
-    if creep.memory.target == None:
-        # should never happen. but if it does, fuck it.
-        print('No containers could be found for this creep: ' + str(creep.name))
+    if creep.pos.isNearTo(Game.getObjectById(creep.memory.source)):
+        containers = creep.room.find(FIND_STRUCTURES).filter(lambda s: s.structureType == STRUCTURE_CONTAINER)
+        creep.memory.target = creep.pos.findClosestByPath(containers).id
+        if creep.memory.target == None:
+            # should never happen. but if it does, fuck it.
+            print('No containers could be found for this creep: ' + str(creep.name))
+    else:
+        CreepMove(creep, Game.getObjectById(creep.memory.source))
 
 def MinerTransferToContainer (creep):
     """
